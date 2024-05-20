@@ -28,7 +28,7 @@
 // #include "vehicles/ScaniaV8_50ton.h" // SCANIA V8 50 ton truck. Unknown model. Bad quality!
 // #include "vehicles/ScaniaV8.h" // SCANIA V8 truck, unknown model
 // #include "vehicles/1000HpScaniaV8.h" // 1000 HP SCANIA V8 truck with open pipes. Insane sound! Good bass speakers reqired
-// #include "vehicles/Scania143.h" // SCANIA 143 V8 - the legend! The best sounding in my opinion
+ #include "vehicles/Scania143.h" // SCANIA 143 V8 - the legend! The best sounding in my opinion
 // #include "vehicles/ScaniaV8Firetruck.h" // SCANIA V8 firetruck, automatic Allison 6 speed transmission with torque converter, "Martinshorn" siren
 // #include "vehicles/VolvoFH16_750.h" // Volvo FH16 750 truck. Inline 6, 750 horses, open pipes!
 // #include "vehicles/VolvoFH16_OpenPipe.h" // Volvo FH truck. Inline 6, open pipes, alternative version
@@ -36,7 +36,7 @@
 // #include "vehicles/ManKat.h" // MAN KAT V8 Diesel German Bundeswehr military truck
 // #include "vehicles/MagirusDeutz256.h" // Magirus Deutz 256 air coolded V8 Diesel truck
 // #include "vehicles/MagirusMercur125.h" // Magirus Mercur air coolded V6 Diesel truck
-#include "vehicles/Saurer2DM.h" // Swiss Saurer 2DM R6 Diesel truck
+// #include "vehicles/Saurer2DM.h" // Swiss Saurer 2DM R6 Diesel truck
 
 // Russian trucks --------
 // #include "vehicles/Ural4320.h" // URAL 4320 6x6 V8 Diesel military truck

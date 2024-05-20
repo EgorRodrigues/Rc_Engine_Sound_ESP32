@@ -73,7 +73,7 @@
   - Make sure to have enough copper area around motor + and - for IC heatsinking!
   - Connect a 100 - 470uF electrolytic cap and a 100nF tantalum or ceramic cap across pins 2 - 3
 */
-//#define RZ7886_DRIVER_MODE // An RZ7886 motor driver is used instead of a standard RC Crawler Type ESC. suitable for motors up to 370 size, for example WPL vehicles.
+// #define RZ7886_DRIVER_MODE // An RZ7886 motor driver is used instead of a standard RC Crawler Type ESC. suitable for motors up to 370 size, for example WPL vehicles.
 const uint16_t RZ7886_FREQUENCY = 500;     // 500 Hz is recommended. It is not audible, if virtual engine sound is running. Higher frequencies may overheat the driver IC!
 const uint8_t RZ7886_DRAGBRAKE_DUTY = 100; // 0 - 100%. 100% = max. brake power while standing still. 100% is recommended for crawlers.
 
@@ -125,7 +125,7 @@ uint16_t globalAccelerationPercentage = 100; // about 100 - 200% (200 for Jeep, 
 
 /* Battery low discharge protection (only for boards with voltage divider resistors):
  *  IMPORTANT: Enter used resistor values in Ohms (Ω) and THEN adjust DIODE_DROP, until your readings match the actual battery voltage! */
-//#define BATTERY_PROTECTION // This will disable the ESC output, if the battery cutout voltage is reached. 2 fast flashes = battery error!
+// #define BATTERY_PROTECTION // This will disable the ESC output, if the battery cutout voltage is reached. 2 fast flashes = battery error!
 const float CUTOFF_VOLTAGE = 3.3;        // Usually 3.3 V per LiPo cell. NEVER below 3.2 V!
 const float FULLY_CHARGED_VOLTAGE = 4.2; // Usually 4.2 V per LiPo cell, NEVER above!
 const float RECOVERY_HYSTERESIS = 0.2;   // around 0.2 V

@@ -1,52 +1,21 @@
 /* RC engine sound & light controller for Arduino ESP32. Written by TheDIYGuy999
     Based on the code for ATmega 328: https://github.com/TheDIYGuy999/Rc_Engine_Sound
-
-    ***** ESP32 CPU frequency must be set to 240MHz! *****
-
-   Sound files converted with: https://github.com/TheDIYGuy999/Rc_Engine_Sound_ESP32/blob/master/tools/Audio2Header.html
-   Original converter code by bitluni (send him a high five, if you like the code)
-
-   Parts of automatic transmision code from Wombii's fork: https://github.com/Wombii/Rc_Engine_Sound_ESP32
-
-   Dashboard, Neopixel and SUMD support by Gamadril: https://github.com/Gamadril/Rc_Engine_Sound_ESP32
-
-   Contributors:
-   - Christian Fiebig https://github.com/fiechr
-
-   Visual Studio Code IDE support added (you need to install PlatformIO plugin and git https://git-scm.com)
-   Arduino IDE is supported as well, but I recommend to use VS Code, because libraries and boards are managed automatically.
 */
 
-char codeVersion[] = "9.12.0"; // Software revision.
+//*************************************************************************************************************************
+// Essa versão light foi originada da versão 9.12.0 com as modificações do ODiyGuyBrasil. Acesse meu canal no YouTube
+//************************************************************************************************************************
 
-//
-// =======================================================================================================
-// ERROR CODES (INDICATOR LIGHTS, BEEPS)
-// =======================================================================================================
-//
-/*
-   Indicators:
-   - Constantly on = no SBUS signal (check "sbusInverted" true / false in "2_Remote.h")
-   - Number of blinks = this channel signal is not between 1400 and 1600 microseconds and can't be auto calibrated (check channel trim settings)
-   - 2 fast blinks = battery error during powering up (see below)
-   - 3 fast blinks = no valid receiver bus signal detected / wrong remote configuration
-
-   Beeps (only, if "#define BATTERY_PROTECTION" in "3_ESC.h"):
-   - Number of beeps = number of detected battery cells in series
-   - 10 fast beeps = battery error, disconnect it!
-*/
-
-//
-// =======================================================================================================
-// ! ! I M P O R T A N T ! !   ALL USER SETTINGS ARE DONE IN THE FOLLOWING TABS, WHICH ARE DISPLAYED ABOVE
-// (ADJUST THEM BEFORE CODE UPLOAD), DO NOT CHANGE ANYTHING IN THIS TAB EXCEPT THE DEBUG OPTIONS
-// =======================================================================================================
-//
+char codeVersion[] = "9.12.0.Light"; // Software revision. Light (alterada por ODiyGuyBrasil)
 
 #include <Arduino.h>
+/* ODiyGuYBrasil Usando Dabble Biblioteca*/
+#include <DabbleESP32.h>
+#include "GamePadModule.h"
+/* Fim Dabble */
 
 // All the required user settings are done in the following .h files:
-#include "0_generalSettings.h" // <<------- general settings
+//#include "0_generalSettings.h" // <<------- general settings
 #include "1_Vehicle.h"         // <<------- Select the vehicle you want to simulate
 #include "2_Remote.h"          // <<------- Remote control system related adjustments
 #include "3_ESC.h"             // <<------- ESC related adjustments
@@ -56,31 +25,14 @@ char codeVersion[] = "9.12.0"; // Software revision.
 #include "7_Servos.h"          // <<------- Servo output related adjustments
 #include "8_Sound.h"           // <<------- Sound related adjustments
 #include "9_Dashboard.h"       // <<------- Dashboard related adjustments
-#include "10_Trailer.h"        // <<------- Trailer related adjustments
+//#include "10_Trailer.h"        // <<------- Trailer related adjustments
 
-// TODO = Things to clean up!
-
-//
-// =======================================================================================================
-// LIRBARIES & HEADER FILES, REQUIRED ESP32 BOARD DEFINITION
-// =======================================================================================================
-//
-
-// Libraries (you have to install all of them in the "Arduino sketchbook"/libraries folder)
-// !! Do NOT install the libraries in the sketch folder.
-// No manual library download is required in Visual Studio Code IDE (see platformio.ini)
 #include <statusLED.h>        // https://github.com/TheDIYGuy999/statusLED <<------- required for LED control
 #if not defined EMBEDDED_SBUS // SBUS library only required, if not embedded SBUS code is used -----------
 #include <SBUS.h>             // https://github.com/TheDIYGuy999/SBUS      <<------- you need to install my fork of this library!
 #endif                        // ------------------------------------------------------------------------------------------------
 #include <rcTrigger.h>        // https://github.com/TheDIYGuy999/rcTrigger <<------- required for RC signal processing
 #include <IBusBM.h>           // https://github.com/bmellink/IBusBM        <<------- required for IBUS interface
-#include <TFT_eSPI.h>         // https://github.com/Bodmer/TFT_eSPI        <<------- required for LCD dashboard. Use v2.3.70
-#if defined NEOPIXEL_ENABLED
-#include <FastLED.h> // https://github.com/FastLED/FastLED        <<------- required for Neopixel support. Use V3.3.3
-#endif
-#include <ESP32AnalogRead.h> // https://github.com/madhephaestus/ESP32AnalogRead <<------- required for battery voltage measurement
-#include <Tone32.h>          // https://github.com/lbernstone/Tone32      <<------- required for battery cell detection beeps // Not for platform = espressif32@4.3.0
 
 // Additional headers (included)
 #include "src/curves.h"    // Nonlinear throttle curve arrays
@@ -97,49 +49,25 @@ char codeVersion[] = "9.12.0"; // Software revision.
 #include "driver/mcpwm.h" // for servo PWM output
 #include "rom/rtc.h"      // for displaying reset reason
 #include "soc/rtc_wdt.h"  // for watchdog timer
-#include <esp_now.h>      // for wireless trailer
-#include <WiFi.h>
-#include <esp_wifi.h>
-#include <Esp.h>    // for displaying memory information
-#include <EEPROM.h> // for non volatile variable storage
+
+/* ODiyGuYBrasil Usando Dabble Biblioteca*/
+GamePadModule GamePad;
+void oDiyGuyDabbleBt();
+/* Fim Dabble */
+
 
 // This stuff is required for Visual Studio Code IDE, if .ino is renamed into .cpp!
 void Task1code(void *parameters);
-void readSbusCommands();
-void readIbusCommands();
-void readSumdCommands();
-void readPpmCommands();
-void readPwmSignals();
+void readDabbleCommands();
 void processRawChannels();
 void failsafeRcSignals();
 void channelZero();
-float batteryVolts();
-void eepromDebugRead();
-void eepromRead();
-void eepromInit();
+// float batteryVolts();
+// void eepromDebugRead();
+// void eepromRead();
+// void eepromInit();
 
-// The following tasks only required for Arduino IDE! ----
-// Install ESP32 board according to: https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/
-// Warning: Use Espressif ESP32 board definition v1.05 or 10.6! v2.x is not working
-// Adjust board settings according to: https://github.com/TheDIYGuy999/Rc_Engine_Sound_ESP32/blob/master/pictures/settings.png
 
-// Visual Studio Code IDE instructions: ----
-// - General settings are done in platformio.ini
-// - !!IMPORTANT!! Rename src.ini to scr.cpp -> This will prevent potential compiler errors
-
-// Make sure to remove -master from your sketch folder name
-
-//
-// =======================================================================================================
-// PIN ASSIGNMENTS & GLOBAL VARIABLES (Do not play around here)
-// =======================================================================================================
-//
-// Pin assignment and wiring instructions ****************************************************************
-
-// ------------------------------------------------------------------------------------
-// Use a 330Ohm resistor in series with all I/O pins! allows to drive LED directly and
-// provides short circuit protection. Also works on the serial Rx pin "VP" (36)
-// ------------------------------------------------------------------------------------
 
 // Serial DEBUG pins -----
 #define DEBUG_RX UART_PIN_NO_CHANGE // 99 is just a dummy, because the "RX0" pin (GPIO3) is used for the headlights and causing issues, if rx enabled! -1 (3 headlights)
@@ -162,6 +90,7 @@ void eepromInit();
 #define PWM_CHANNELS_NUM 6                                           // Number of PWM signal input pins 6
 const uint8_t PWM_CHANNELS[PWM_CHANNELS_NUM] = {1, 2, 3, 4, 5, 6};   // Channel numbers
 const uint8_t PWM_PINS[PWM_CHANNELS_NUM] = {13, 12, 14, 27, 35, 34}; // Input pin numbers (pin 34 & 35 only usable as inputs!)
+
 
 // Output pins -----
 #define ESC_OUT_PIN 33 // connect crawler type ESC here. Not supported in TRACKED_MODE -----
@@ -203,11 +132,8 @@ const uint8_t PWM_PINS[PWM_CHANNELS_NUM] = {13, 12, 14, 27, 35, 34}; // Input pi
 
 #define SHAKER_MOTOR_PIN 23 // Shaker motor (shaking truck while idling and engine start / stop)
 
-#define DAC1 25 // connect pin25 (do not change the pin) to a 10kOhm resistor
-#define DAC2 26 // connect pin26 (do not change the pin) to a 10kOhm resistor
-// both outputs of the resistors above are connected together and then to the outer leg of a
-// 20kOhm potentiometer. The other outer leg connects to GND. The middle leg connects to both inputs
-// of a PAM8403 amplifier and allows to adjust the volume. This way, two speakers can be used.
+#define DAC1 25 
+#define DAC2 26 
 
 // Objects *************************************************************************************
 // Status LED objects (also used for PWM shaker motor and ESC control) -----
@@ -248,38 +174,6 @@ rcTrigger hazardsTrigger(100);
 rcTrigger indicatorLTrigger(100);
 rcTrigger indicatorRTrigger(100);
 
-// Other objects -----
-// Dashboard
-Dashboard dashboard;
-
-#if defined NEOPIXEL_ENABLED
-// Neopixel
-CRGB rgbLEDs[NEOPIXEL_COUNT];
-#endif
-
-// Battery voltage
-ESP32AnalogRead battery;
-
-// Webserver on port 80
-WiFiServer server(80);
-
-// Global variables **********************************************************************
-
-// WiFi variables
-String ssid;
-String password;
-
-// MAC address for communication with tractor TODO
-uint8_t customMACAddress[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-// HTTP request memory
-String header;
-
-// For HTTP GET value
-String valueString = "";
-int pos1 = 0;
-int pos2 = 0;
-
 // PWM processing variables
 #define RMT_TICK_PER_US 1
 // determines how many clock cycles one "tick" is
@@ -291,16 +185,16 @@ volatile uint16_t pwmBuf[PWM_CHANNELS_NUM + 2] = {0};
 uint32_t maxPwmRpmPercentage = 390; // Limit required to prevent controller from crashing @ high engine RPM
 
 // PPM signal processing variables
-#define NUM_OF_PPM_CHL 8                       // The number of channels inside our PPM signal (8 is the maximum!)
-#define NUM_OF_PPM_AVG 1                       // Number of averaging passes (usually one, more will be slow)
-volatile int ppmInp[NUM_OF_PPM_CHL + 1] = {0}; // Input values
+#define NUM_OF_PPM_CHL 8                       
+#define NUM_OF_PPM_AVG 1                       
+volatile int ppmInp[NUM_OF_PPM_CHL + 1] = {0}; 
 volatile int ppmBuf[16] = {0};
 volatile byte counter = NUM_OF_PPM_CHL;
 volatile byte average = NUM_OF_PPM_AVG;
 volatile boolean ready = false;
 volatile unsigned long timelast;
 unsigned long timelastloop;
-uint32_t maxPpmRpmPercentage = 390; // Limit required to prevent controller from crashing @ high engine RPM
+uint32_t maxPpmRpmPercentage = 390; 
 
 // SBUS signal processing variables
 #if not defined EMBEDDED_SBUS // ------------------------
@@ -315,16 +209,6 @@ std::array<int16_t, bfs::SbusRx::NUM_CH()> SBUSchannels;
 #endif // -----------------------------------------------
 bool sbusInit;
 uint32_t maxSbusRpmPercentage = 390; // Limit required to prevent controller from crashing @ high engine RPM
-
-// SUMD signal processing variables
-HardwareSerial serial(2);
-SUMD sumd(serial); // SUMD object on Serial 2 port
-// channel, fail safe, and lost frames data
-uint16_t SUMDchannels[16]; // only 12 are usable!
-bool SUMD_failsafe;
-bool SUMD_frame_lost;
-bool SUMD_init;
-uint32_t maxSumdRpmPercentage = 390; // Limit required to prevent controller from crashing @ high engine RPM
 
 // IBUS signal processing variables
 IBusBM iBus; // IBUS object
@@ -486,90 +370,10 @@ bool rampsUp;
 bool rampsDown;
 bool trailerDetected;
 
-// Battery
-float batteryCutoffvoltage;
-float batteryVoltage;
-uint8_t numberOfCells;
-bool batteryProtection = false;
-
-// ESP NOW variables for wireless trailer communication ----------------------------
-#if defined ENABLE_WIRELESS
-
 volatile uint16_t pollRate = 20;
-
-esp_now_peer_info_t peerInfo; // This MUST be global!! Transmission is not working otherwise!
-
-typedef struct struct_message
-{ // This is the data packet
-  uint8_t tailLight;
-  uint8_t sideLight;
-  uint8_t reversingLight;
-  uint8_t indicatorL;
-  uint8_t indicatorR;
-  bool legsUp;
-  bool legsDown;
-  bool rampsUp;
-  bool rampsDown;
-  bool beaconsOn;
-} struct_message;
-
-// Create a struct_message called trailerData
-struct_message trailerData;
-#endif // --------------------------------------------------------------------------
-
-// The following variables are buffered in the eeprom an can be modified, using the web interface -----
-// 5th wheel switch enable / disable
 bool fifthWhweelDetectionActive = true;
-
-bool useTrailer1;
-bool useTrailer2;
-bool useTrailer3;
-
-uint8_t broadcastAddress1[6];
-uint8_t broadcastAddress2[6];
-uint8_t broadcastAddress3[6];
-
-// Eeprom size and storage addresses ----------------------------------------------
-#define EEPROM_SIZE 256 // 256 Bytes (512 is maximum)
-
-#define adr_eprom_init 0 // Eeprom initialized or not?
-
-#define adr_eprom_useTrailer1 4 // Trailer 1
-#define adr_eprom_Trailer1Mac0 8
-#define adr_eprom_Trailer1Mac1 12
-#define adr_eprom_Trailer1Mac2 16
-#define adr_eprom_Trailer1Mac3 20
-#define adr_eprom_Trailer1Mac4 24
-#define adr_eprom_Trailer1Mac5 28
-
-#define adr_eprom_useTrailer2 32 // Trailer 2
-#define adr_eprom_Trailer2Mac0 36
-#define adr_eprom_Trailer2Mac1 40
-#define adr_eprom_Trailer2Mac2 44
-#define adr_eprom_Trailer2Mac3 48
-#define adr_eprom_Trailer2Mac4 52
-#define adr_eprom_Trailer2Mac5 56
-
-#define adr_eprom_useTrailer3 60 // Trailer 3
-#define adr_eprom_Trailer3Mac0 64
-#define adr_eprom_Trailer3Mac1 68
-#define adr_eprom_Trailer3Mac2 72
-#define adr_eprom_Trailer3Mac3 76
-#define adr_eprom_Trailer3Mac4 80
-#define adr_eprom_Trailer3Mac5 84
-
-#define adr_eprom_fifthWhweelDetectionActive 88
-#define adr_eprom_tailLightBrightness 92
-#define adr_eprom_sideLightBrightness 96
-#define adr_eprom_reversingLightBrightness 100
-#define adr_eprom_indicatorLightBrightness 104
-#define adr_eprom_ssid 192     // 192
-#define adr_eprom_password 224 // 224
-
-// DEBUG stuff
 volatile uint8_t coreId = 99;
 
-// Our main tasks
 TaskHandle_t Task1;
 
 // Loop time (for debug)
@@ -602,12 +406,6 @@ float us2degree(uint16_t value)
 {
   return (value - 500) / 11.111 - 90.0;
 }
-
-//
-// =======================================================================================================
-// INTERRUPT FOR VARIABLE SPEED PLAYBACK (Engine sound, turbo sound)
-// =======================================================================================================
-//
 
 void IRAM_ATTR variablePlaybackTimer()
 {
@@ -694,8 +492,6 @@ void IRAM_ATTR variablePlaybackTimer()
         if (curRevSample < revSampleCount)
           curRevSample++;
 #endif
-
-        // Trigger throttle dependent Diesel ignition "knock" sound (played in the fixed sample rate interrupt)
         if (curEngineSample - lastDieselKnockSample > (sampleCount / dieselKnockInterval))
         {
           dieselKnockTrigger = true;
@@ -739,10 +535,6 @@ void IRAM_ATTR variablePlaybackTimer()
 
     // Engine sound mixer ----
 #ifdef REV_SOUND
-    // Mixing the idle and rev sounds together, according to engine rpm
-    // Below the "revSwitchPoint" target, the idle volume precentage is 90%, then falling to 0% @ max. rpm.
-    // The total of idle and rev volume percentage is always 100%
-
     if (currentRpm > revSwitchPoint)
       a1Multi = map(currentRpm, idleEndPoint, revSwitchPoint, 0, idleVolumeProportionPercentage);
     else
@@ -783,8 +575,6 @@ void IRAM_ATTR variablePlaybackTimer()
     if (neutralGear)
       d = 0; // used for gearbox whining simulation, so not active in gearbox neutral
 #endif
-
-    // Supercharger sound --------------------------
     if (curChargerSample < chargerSampleCount - 1)
     {
       e = (chargerSamples[curChargerSample] * throttleDependentChargerVolume / 100 * chargerVolumePercentage / 100);
@@ -844,7 +634,6 @@ void IRAM_ATTR variablePlaybackTimer()
     {
       curEngineSample = 0;
     }
-
     // fade engine sound out
     if (millis() - attenuatorMillis > 100)
     { // Every 50ms
@@ -852,7 +641,6 @@ void IRAM_ATTR variablePlaybackTimer()
       attenuator++;          // attenuate volume
       speedPercentage += 20; // make it slower (10)
     }
-
     if (attenuator >= 50 || speedPercentage >= 500)
     { // 50 & 500
       a = 0;
@@ -862,7 +650,6 @@ void IRAM_ATTR variablePlaybackTimer()
       engineStop = false;
     }
     break;
-
   case PARKING_BRAKE: // parking brake bleeding air sound after engine is off ----------------------------
 
     if (!parkingBrakeTrigger)
@@ -873,59 +660,40 @@ void IRAM_ATTR variablePlaybackTimer()
 
   } // end of switch case
 
-  // DAC output (groups a, b, c mixed together) ************************************************************************
-
   dacWrite(DAC1, constrain(((a * 8 / 10) + (b / 2) + (c / 5) + (d / 5) + (e / 5) + f + g) * masterVolume / 100 + dacOffset, 0, 255)); // Mix signals, add 128 offset, write  to DAC
-  // dacWrite(DAC1, constrain(a * masterVolume / 100 + dacOffset, 0, 255));
-  // dacWrite(DAC1, constrain(a + 128, 0, 255));
-
-  // portEXIT_CRITICAL_ISR(&variableTimerMux);
 }
-
-//
-// =======================================================================================================
-// INTERRUPT FOR FIXED SPEED PLAYBACK (Horn etc., played in parallel with engine sound)
-// =======================================================================================================
-//
 
 void IRAM_ATTR fixedPlaybackTimer()
 {
-
-  // coreId = xPortGetCoreID(); // Running on core 1
-
-  static uint32_t curHornSample = 0;                            // Index of currently loaded horn sample
-  static uint32_t curSirenSample = 0;                           // Index of currently loaded siren sample
-  static uint32_t curSound1Sample = 0;                          // Index of currently loaded sound1 sample
-  static uint32_t curReversingSample = 0;                       // Index of currently loaded reversing beep sample
-  static uint32_t curIndicatorSample = 0;                       // Index of currently loaded indicator tick sample
-  static uint32_t curWastegateSample = 0;                       // Index of currently loaded wastegate sample
-  static uint32_t curBrakeSample = 0;                           // Index of currently loaded brake sound sample
-  static uint32_t curParkingBrakeSample = 0;                    // Index of currently loaded brake sound sample
-  static uint32_t curShiftingSample = 0;                        // Index of currently loaded shifting sample
-  static uint32_t curDieselKnockSample = 0;                     // Index of currently loaded Diesel knock sample
-  static uint32_t curCouplingSample = 0;                        // Index of currently loaded trailer coupling sample
-  static uint32_t curUncouplingSample = 0;                      // Index of currently loaded trailer uncoupling sample
-  static uint32_t curHydraulicFlowSample = 0;                   // Index of currently loaded hydraulic flow sample
-  static uint32_t curTrackRattleSample = 0;                     // Index of currently loaded track rattle sample
-  static uint32_t curBucketRattleSample = 0;                    // Index of currently loaded bucket rattle sample
-  static uint32_t curTireSquealSample = 0;                      // Index of currently loaded tire squeal sample
-  static uint32_t curOutOfFuelSample = 0;                       // Index of currently loaded out of fuel sample
-  static int32_t a, a1, a2 = 0;                                 // Input signals "a" for mixer
-  static int32_t b, b0, b1, b2, b3, b4, b5, b6, b7, b8, b9 = 0; // Input signals "b" for mixer
-  static int32_t c, c1, c2, c3 = 0;                             // Input signals "c" for mixer
-  static int32_t d, d1, d2 = 0;                                 // Input signals "d" for mixer
-  static boolean knockSilent = 0;                               // This knock will be more silent
-  static boolean knockMedium = 0;                               // This knock will be medium
-  static uint8_t curKnockCylinder = 0;                          // Index of currently ignited zylinder
-
-  // portENTER_CRITICAL_ISR(&fixedTimerMux);
-
-  // Group "a" (horn & siren) ******************************************************************
+  static uint32_t curHornSample = 0;                           
+  static uint32_t curSirenSample = 0;                          
+  static uint32_t curSound1Sample = 0;                          
+  static uint32_t curReversingSample = 0;                      
+  static uint32_t curIndicatorSample = 0;                       
+  static uint32_t curWastegateSample = 0;                     
+  static uint32_t curBrakeSample = 0;                           
+  static uint32_t curParkingBrakeSample = 0;                    
+  static uint32_t curShiftingSample = 0;                        
+  static uint32_t curDieselKnockSample = 0;                     
+  static uint32_t curCouplingSample = 0;                        
+  static uint32_t curUncouplingSample = 0;                     
+  static uint32_t curHydraulicFlowSample = 0;                   
+  static uint32_t curTrackRattleSample = 0;                     
+  static uint32_t curBucketRattleSample = 0;                    
+  static uint32_t curTireSquealSample = 0;                     
+  static uint32_t curOutOfFuelSample = 0;                       
+  static int32_t a, a1, a2 = 0;                                 
+  static int32_t b, b0, b1, b2, b3, b4, b5, b6, b7, b8, b9 = 0; 
+  static int32_t c, c1, c2, c3 = 0;                             
+  static int32_t d, d1, d2 = 0;                                 
+  static boolean knockSilent = 0;                              
+  static boolean knockMedium = 0;                               
+  static uint8_t curKnockCylinder = 0;                          
 
   if (hornTrigger || hornLatch)
   {
-    fixedTimerTicks = 4000000 / hornSampleRate;         // our fixed sampling rate
-    timerAlarmWrite(fixedTimer, fixedTimerTicks, true); // // change timer ticks, autoreload true
+    fixedTimerTicks = 4000000 / hornSampleRate;         
+    timerAlarmWrite(fixedTimer, fixedTimerTicks, true); 
 
     if (curHornSample < hornSampleCount - 1)
     {
@@ -946,8 +714,8 @@ void IRAM_ATTR fixedPlaybackTimer()
 
   if (sirenTrigger || sirenLatch)
   {
-    fixedTimerTicks = 4000000 / sirenSampleRate;        // our fixed sampling rate
-    timerAlarmWrite(fixedTimer, fixedTimerTicks, true); // // change timer ticks, autoreload true
+    fixedTimerTicks = 4000000 / sirenSampleRate;        
+    timerAlarmWrite(fixedTimer, fixedTimerTicks, true); 
 
 #if defined SIREN_STOP
     if (!sirenTrigger)
@@ -978,14 +746,10 @@ void IRAM_ATTR fixedPlaybackTimer()
     cannonFlash = true; // Tank cannon flash triggering in TRACKED_MODE
   else
     cannonFlash = false;
-
-  // Group "b" (other sounds) **********************************************************************
-
-  // Sound 1 "b0" ----
   if (sound1trigger)
   {
-    fixedTimerTicks = 4000000 / sound1SampleRate;       // our fixed sampling rate
-    timerAlarmWrite(fixedTimer, fixedTimerTicks, true); // // change timer ticks, autoreload true
+    fixedTimerTicks = 4000000 / sound1SampleRate;       
+    timerAlarmWrite(fixedTimer, fixedTimerTicks, true); 
 
     if (curSound1Sample < sound1SampleCount - 1)
     {
@@ -1006,8 +770,8 @@ void IRAM_ATTR fixedPlaybackTimer()
   // Reversing beep sound "b1" ----
   if (engineRunning && escInReverse)
   {
-    fixedTimerTicks = 4000000 / reversingSampleRate;    // our fixed sampling rate
-    timerAlarmWrite(fixedTimer, fixedTimerTicks, true); // // change timer ticks, autoreload true
+    fixedTimerTicks = 4000000 / reversingSampleRate;    
+    timerAlarmWrite(fixedTimer, fixedTimerTicks, true); 
 
     if (curReversingSample < reversingSampleCount - 1)
     {
@@ -1021,11 +785,9 @@ void IRAM_ATTR fixedPlaybackTimer()
   }
   else
   {
-    curReversingSample = 0; // ensure, next sound will start @ first sample
+    curReversingSample = 0; 
     b1 = 0;
   }
-
-  // Indicator tick sound "b2" ----------------------------------------------------------------------
 #if not defined NO_INDICATOR_SOUND
   if (indicatorSoundOn)
   {
@@ -1044,12 +806,10 @@ void IRAM_ATTR fixedPlaybackTimer()
   }
   else
   {
-    curIndicatorSample = 0; // ensure, next sound will start @ first sample
+    curIndicatorSample = 0; 
     b2 = 0;
   }
 #endif
-
-  // Wastegate (blowoff) sound, triggered after rapid throttle drop -----------------------------------
   if (wastegateTrigger)
   {
     if (curWastegateSample < wastegateSampleCount - 1)
@@ -1067,8 +827,6 @@ void IRAM_ATTR fixedPlaybackTimer()
     b3 = 0;
     curWastegateSample = 0; // ensure, next sound will start @ first sample
   }
-
-  // Air brake release sound, triggered after stop -----------------------------------------------
   if (airBrakeTrigger)
   {
     if (curBrakeSample < brakeSampleCount - 1)
@@ -1084,10 +842,8 @@ void IRAM_ATTR fixedPlaybackTimer()
   else
   {
     b4 = 0;
-    curBrakeSample = 0; // ensure, next sound will start @ first sample
+    curBrakeSample = 0; 
   }
-
-  // Air parking brake attaching sound, triggered after engine off --------------------------------
   if (parkingBrakeTrigger)
   {
     if (curParkingBrakeSample < parkingBrakeSampleCount - 1)
@@ -1103,10 +859,8 @@ void IRAM_ATTR fixedPlaybackTimer()
   else
   {
     b5 = 0;
-    curParkingBrakeSample = 0; // ensure, next sound will start @ first sample
+    curParkingBrakeSample = 0; 
   }
-
-  // Pneumatic gear shifting sound, triggered while shifting the TAMIYA 3 speed transmission ------
   if (shiftingTrigger && engineRunning && !automatic && !doubleClutch)
   {
     if (curShiftingSample < shiftingSampleCount - 1)
@@ -1124,8 +878,6 @@ void IRAM_ATTR fixedPlaybackTimer()
     b6 = 0;
     curShiftingSample = 0; // ensure, next sound will start @ first sample
   }
-
-  // Diesel ignition "knock" is played in fixed sample rate section, because we don't want changing pitch! ------
   if (dieselKnockTriggerFirst)
   {
     dieselKnockTriggerFirst = false;
@@ -1138,7 +890,6 @@ void IRAM_ATTR fixedPlaybackTimer()
     curKnockCylinder++; // Count ignition sequence
     curDieselKnockSample = 0;
   }
-
 #ifdef V8 // (former ADAPTIVE_KNOCK_VOLUME, rename it in your config file!)
   // Ford or Scania V8 ignition sequence: 1 - 5 - 4 - 2* - 6 - 3 - 7 - 8* (* = louder knock pulses, because 2nd exhaust in same manifold after 90°)
   if (curKnockCylinder == 4 || curKnockCylinder == 8)
@@ -1146,7 +897,6 @@ void IRAM_ATTR fixedPlaybackTimer()
   else
     knockSilent = true;
 #endif
-
 #ifdef V8_MEDIUM // (former ADAPTIVE_KNOCK_VOLUME, rename it in your config file!)
   // This is EXPERIMENTAL!! TODO
   if (curKnockCylinder == 5 || curKnockCylinder == 1)
@@ -1154,7 +904,6 @@ void IRAM_ATTR fixedPlaybackTimer()
   else
     knockMedium = true;
 #endif
-
 #ifdef V8_468 // (Chevy 468, containing 16 ignition pulses)
   // 1th, 5th, 9th and 13th are the loudest
   // Ignition sequence: 1 - 8 - 4* - 3 - 6 - 5 - 7* - 2
@@ -1163,7 +912,6 @@ void IRAM_ATTR fixedPlaybackTimer()
   else
     knockSilent = true;
 #endif
-
 #ifdef V2
   // V2 engine: 1st and 2nd knock pulses (of 4) will be louder
   if (curKnockCylinder == 1 || curKnockCylinder == 2)
@@ -1171,7 +919,6 @@ void IRAM_ATTR fixedPlaybackTimer()
   else
     knockSilent = true;
 #endif
-
 #ifdef R6
   // R6 inline 6 engine: 6th knock pulse (of 6) will be louder
   if (curKnockCylinder == 6)
@@ -1179,7 +926,6 @@ void IRAM_ATTR fixedPlaybackTimer()
   else
     knockSilent = true;
 #endif
-
 #ifdef R6_2
   // R6 inline 6 engine: 6th and 3rd knock pulse (of 6) will be louder
   if (curKnockCylinder == 6 || curKnockCylinder == 3)
@@ -1187,7 +933,6 @@ void IRAM_ATTR fixedPlaybackTimer()
   else
     knockSilent = true;
 #endif
-
   if (curDieselKnockSample < knockSampleCount)
   {
 #if defined RPM_DEPENDENT_KNOCK // knock volume also depending on engine rpm
@@ -1203,7 +948,6 @@ void IRAM_ATTR fixedPlaybackTimer()
     if (knockMedium)
       b7 = b7 * dieselKnockAdaptiveVolumePercentage / 75;
   }
-
 #if not defined EXCAVATOR_MODE
   // Trailer coupling sound, triggered by switch -----------------------------------------------
 #ifdef COUPLING_SOUND
@@ -1224,8 +968,6 @@ void IRAM_ATTR fixedPlaybackTimer()
     b8 = 0;
     curCouplingSample = 0; // ensure, next sound will start @ first sample
   }
-
-  // Trailer uncoupling sound, triggered by switch -----------------------------------------------
   if (uncouplingTrigger)
   {
     if (curUncouplingSample < uncouplingSampleCount - 1)
@@ -1245,12 +987,7 @@ void IRAM_ATTR fixedPlaybackTimer()
   }
 #endif
 #endif
-
-  // Group "c" (excavator sounds) **********************************************************************
-
 #if defined EXCAVATOR_MODE
-
-  // Hydraulic fluid flow sound -----------------------
   if (curHydraulicFlowSample < hydraulicFlowSampleCount - 1)
   {
     c1 = (hydraulicFlowSamples[curHydraulicFlowSample] * hydraulicFlowVolumePercentage / 100 * hydraulicFlowVolume / 100);
@@ -1260,8 +997,6 @@ void IRAM_ATTR fixedPlaybackTimer()
   {
     curHydraulicFlowSample = 0;
   }
-
-  // Track rattle sound -----------------------
   if (curTrackRattleSample < trackRattleSampleCount - 1)
   {
     c2 = (trackRattleSamples[curTrackRattleSample] * trackRattleVolumePercentage / 100 * trackRattleVolume / 100);
@@ -1291,9 +1026,6 @@ void IRAM_ATTR fixedPlaybackTimer()
     curBucketRattleSample = 0; // ensure, next sound will start @ first sample
   }
 #endif
-
-  // Group "d" (additional sounds) **********************************************************************
-
 #if defined TIRE_SQUEAL
   // Tire squeal sound -----------------------
   if (curTireSquealSample < tireSquealSampleCount - 1)
@@ -1307,7 +1039,6 @@ void IRAM_ATTR fixedPlaybackTimer()
     curTireSquealSample = 0;
   }
 #endif
-
 #if defined BATTERY_PROTECTION
   // Out of fuel sound, triggered by battery voltage -----------------------------------------------
   if (outOfFuelMessageTrigger)
@@ -1328,31 +1059,14 @@ void IRAM_ATTR fixedPlaybackTimer()
     curOutOfFuelSample = 0; // ensure, next sound will start @ first sample
   }
 #endif
-
-  // Mixing sounds together **********************************************************************
   a = a1 + a2; // Horn & siren
   // if (a < 2 && a > -2) a = 0; // Remove noise floor TODO, experimental
   b = b0 * 5 + b1 + b2 / 2 + b3 + b4 + b5 + b6 + b7 + b8 + b9; // Other sounds
   c = c1 + c2 + c3;                                            // Excavator sounds
   d = d1 + d2;                                                 // Additional sounds
-
-  // DAC output (groups mixed together) ****************************************************************************
-
-  // dacDebug = constrain(((a * 8 / 10) + (b * 2 / 10) + c + d) * masterVolume / 100 + dacOffset, 0, 255); // Mix signals, add 128 offset, write result to DAC
   dacWrite(DAC2, constrain(((a * 8 / 10) + (b * 2 / 10) + c + d) * masterVolume / 100 + dacOffset, 0, 255)); // Mix signals, add 128 offset, write result to DAC
-  // dacWrite(DAC2, constrain( a2 * masterVolume / 100 + dacOffset, 0, 255)); // Mix signals, add 128 offset, write result to DAC
-  // dacWrite(DAC2, 0);
-
-  // portEXIT_CRITICAL_ISR(&fixedTimerMux);
 }
 
-//
-// =======================================================================================================
-// PWM SIGNAL READ INTERRUPT
-// =======================================================================================================
-//
-
-// Reference https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/rmt.html?highlight=rmt
 static void IRAM_ATTR rmt_isr_handler(void *arg)
 {
 
@@ -1386,7 +1100,8 @@ static void IRAM_ATTR rmt_isr_handler(void *arg)
 
         if (item)
         {
-          pwmBuf[i + 1] = item->duration0; // pointer -> variable
+          // pwmBuf[i + 1] = item->duration0; // pointer -> variable (esta antes)
+          pwmBuf[i] = item->duration0; // pointer -> variable (OduyGuybrasil)
         }
 
         RMT.conf_ch[channel].conf1.mem_wr_rst = 1;
@@ -1406,12 +1121,6 @@ static void IRAM_ATTR rmt_isr_handler(void *arg)
     xSemaphoreGive(xPwmSemaphore); // Free or "Give" the semaphore for others, if not required!
   }
 }
-
-//
-// =======================================================================================================
-// PPM SIGNAL READ INTERRUPT
-// =======================================================================================================
-//
 
 void IRAM_ATTR readPpm()
 {
@@ -1445,51 +1154,17 @@ void IRAM_ATTR readPpm()
   }
 }
 
-//
-// =======================================================================================================
-// TRAILER PRESENCE SWITCH INTERRUPT (not usable with third brake light or RZ7886 motor driver)
-// =======================================================================================================
-//
-#if not defined THIRD_BRAKELIGHT and not defined RZ7886_DRIVER_MODE
-void IRAM_ATTR trailerPresenceSwitchInterrupt()
-{
-  couplerSwitchInteruptLatch = true;
-}
-#endif
+uint16_t y_axis;
 
-//
-// =======================================================================================================
-// ESP NOW TRAILER DATA SENT CALLBACK
-// =======================================================================================================
-//
-
-// callback when data is sent
-void IRAM_ATTR onTrailerDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
-{
-
-#ifdef ESPNOW_DEBUG
-
-  // This will confirm, if data was received by peer and which one
-  Serial.printf("ESP-NOW data received by peer (trailer) %02x:%02x:%02x:%02x:%02x:%02x : %s\n",
-                (unsigned char)mac_addr[0],
-                (unsigned char)mac_addr[1],
-                (unsigned char)mac_addr[2],
-                (unsigned char)mac_addr[3],
-                (unsigned char)mac_addr[4],
-                (unsigned char)mac_addr[5],
-                ESP_NOW_SEND_SUCCESS == status ? "OK" : "FAILED");
-
-  // pollRate = ESP_NOW_SEND_SUCCESS ? 20 : 100; // TODO
-
-#endif
+// ODiyGuyBrasil
+void oDiyGuyDabbleBt(){
+  Dabble.processInput();             //this function is used to refresh data obtained from smartphone.Hence calling this function is mandatory in order to get data properly from your mobile.
+  Serial.print('\t');
+  y_axis = map(GamePad.getYaxisData(),-6,7,172,1811);
+  Serial.print("y_axis: ");
+  Serial.println(y_axis);
 }
 
-//
-// =======================================================================================================
-// mcpwm unit 0 SETUP for servos (1x during startup)
-// =======================================================================================================
-//
-// See: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/mcpwm.html#configure
 
 void setupMcpwm()
 {
@@ -1511,13 +1186,6 @@ void setupMcpwm()
   mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config); // Configure PWM0A & PWM0B
   mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_1, &pwm_config); // Configure PWM1A & PWM1B
 }
-
-//
-// =======================================================================================================
-// mcpwm unit 1 SETUP for ESC (1x during startup)
-// =======================================================================================================
-//
-// See: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/mcpwm.html#configure
 
 void setupMcpwmESC()
 {
@@ -1561,181 +1229,6 @@ void setupMcpwmESC()
 
 //
 // =======================================================================================================
-// ESP NOW SETUP FOR WIRELESS TRAILER CONTROL
-// =======================================================================================================
-//
-
-void setupEspNow()
-{
-
-#if defined ENABLE_WIRELESS
-  Serial.printf("ENABLE_WIRELESS option enabled\n");
-  // Serial.printf("Sound controller MAC address: %s\n", WiFi.macAddress().c_str());
-  //  Set device as a Wi-Fi Station for ESP-NOW
-  WiFi.mode(WIFI_STA); // WIFI_STA = Station
-
-  // Set IP address
-  IPAddress IP = WiFi.softAPIP();
-
-  Serial.printf("\nInformations for web configuration via your cell phone or computer *******************************\n");
-  Serial.print("SSID: ");
-  Serial.println(ssid);
-  Serial.print("Password: ");
-  Serial.println(password);
-  Serial.print("IP address: ");
-  Serial.println(IP);
-
-  // shut down wifi
-  WiFi.disconnect();
-
-  // Start access point
-  WiFi.softAP(ssid.c_str(), password.c_str());
-
-  Serial.printf("\nWiFi Tx Power Level: %u", WiFi.getTxPower());
-  WiFi.setTxPower(cpType); // WiFi and ESP-Now power according to "0_generalSettings.h"
-  Serial.printf("\nWiFi Tx Power Level changed to: %u\n\n", WiFi.getTxPower());
-
-  server.begin(); // Start Webserver
-
-  // Init ESP-NOW
-  if (esp_now_init() != ESP_OK)
-  {
-    Serial.printf("Error initializing ESP-NOW!\n");
-    return;
-  }
-
-  // Register callback function to call when data was sent (used only for debug for now)
-  esp_now_register_send_cb(onTrailerDataSent); // TODO, optional
-
-  // Register peer
-  peerInfo.channel = 0;
-  peerInfo.encrypt = false;
-
-  Serial.printf("The following trailers are currently enabled:\n");
-  // Add peer 1 (1st trailer)
-  if (useTrailer1)
-  {
-    memcpy(peerInfo.peer_addr, broadcastAddress1, 6); // TODO!
-    Serial.printf("Trailer 1 MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n", broadcastAddress1[0], broadcastAddress1[1], broadcastAddress1[2], broadcastAddress1[3], broadcastAddress1[4], broadcastAddress1[5]);
-    if (esp_now_add_peer(&peerInfo) != ESP_OK)
-    {
-      Serial.printf("Failed to add peer #1 (1st trailer)\n");
-      return;
-    }
-  }
-
-  // Add peer 2 (2nd trailer)
-  if (useTrailer2)
-  {
-    memcpy(peerInfo.peer_addr, broadcastAddress2, 6);
-    Serial.printf("Trailer 2 MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n", broadcastAddress2[0], broadcastAddress2[1], broadcastAddress2[2], broadcastAddress2[3], broadcastAddress2[4], broadcastAddress2[5]);
-    if (esp_now_add_peer(&peerInfo) != ESP_OK)
-    {
-      Serial.printf("Failed to add peer #2 (2nd trailer)\n");
-      return;
-    }
-  }
-
-  // Add peer 3 (3rd trailer)
-  if (useTrailer3)
-  {
-    memcpy(peerInfo.peer_addr, broadcastAddress3, 6);
-    Serial.printf("Trailer 3 MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n", broadcastAddress3[0], broadcastAddress3[1], broadcastAddress3[2], broadcastAddress3[3], broadcastAddress3[4], broadcastAddress3[5]);
-    if (esp_now_add_peer(&peerInfo) != ESP_OK)
-    {
-      Serial.printf("Failed to add peer #3 (3rd trailer)\n");
-      return;
-    }
-  }
-#else
-  Serial.printf("ENABLE_WIRELESS option disabled, no WiFi configuration or ESP-Now Trailer!\n");
-#endif // ENABLE_WIRELESS
-  Serial.printf("-------------------------------------\n");
-}
-
-//
-// =======================================================================================================
-// BATTERY SETUP
-// =======================================================================================================
-//
-
-void setupBattery()
-{
-#if defined BATTERY_PROTECTION
-
-  Serial.printf("Battery voltage: %.2f V\n", batteryVolts());
-  Serial.printf("Cutoff voltage per cell: %.2f V\n", CUTOFF_VOLTAGE);
-  Serial.printf("Fully charged voltage per cell: %.2f V\n", FULLY_CHARGED_VOLTAGE);
-
-#define CELL_SETPOINT (CUTOFF_VOLTAGE - ((FULLY_CHARGED_VOLTAGE - CUTOFF_VOLTAGE) / 2))
-
-  if (batteryVolts() <= CELL_SETPOINT * 2)
-    numberOfCells = 1;
-  if (batteryVolts() > CELL_SETPOINT * 2)
-    numberOfCells = 2;
-  if (batteryVolts() > CELL_SETPOINT * 3)
-    numberOfCells = 3;
-  if (batteryVolts() > FULLY_CHARGED_VOLTAGE * 3)
-    numberOfCells = 4;
-  batteryCutoffvoltage = CUTOFF_VOLTAGE * numberOfCells; // Calculate cutoff voltage for battery protection
-  if (numberOfCells > 1 && numberOfCells < 4)
-  { // Only 2S & 3S batteries are supported!
-    Serial.printf("Number of cells: %i (%iS battery detected) Based on setpoint: %.2f V\n", numberOfCells, numberOfCells, (CELL_SETPOINT * numberOfCells));
-    Serial.printf("Battery cutoff voltage: %.2f V (%i * %.2f V) \n", batteryCutoffvoltage, numberOfCells, CUTOFF_VOLTAGE);
-    for (uint8_t beeps = 0; beeps < numberOfCells; beeps++)
-    { // Number of beeps = number of cells in series
-      tone(26, 3000, 4, 0);
-      // tone(26, 3000, 4); // For platform = espressif32@4.3.0
-      delay(200);
-    }
-  }
-  else
-  {
-    Serial.printf("Error, no valid battery detected! Only 2S & 3S batteries are supported!\n");
-    Serial.printf("REMOVE BATTERY, CONTROLLER IS LOCKED = 2 FAST FLASHES!\n");
-    bool locked = true;
-    for (uint8_t beeps = 0; beeps < 10; beeps++)
-    { // Number of beeps = number of cells in series
-      tone(26, 3000, 4, 0);
-      // tone(26, 3000, 4); // For platform = espressif32@4.3.0
-      delay(30);
-    }
-    while (locked)
-    {
-      // wait here forever!
-      indicatorL.flash(70, 75, 500, 2); // Show 2 fast flashes on indicators!
-      indicatorR.flash(70, 75, 500, 2);
-      rtc_wdt_feed(); // Feed watchdog timer
-    }
-  }
-#else
-  Serial.printf("Warning, BATTERY_PROTECTION disabled! ESC with low discharge protection required!\n");
-#endif
-  Serial.printf("-------------------------------------\n");
-}
-
-//
-// =======================================================================================================
-// EEPROM SETUP
-// =======================================================================================================
-//
-
-void setupEeprom()
-{
-  EEPROM.begin(EEPROM_SIZE);
-#if defined ERASE_EEPROM_ON_BOOT
-  eepromErase(); // uncomment this option, if you want to erase all stored settings!
-#endif
-  eepromInit(); // Init new board with default values
-  eepromRead(); // Read settings from Eeprom
-  Serial.print("current eeprom_id: ");
-  Serial.println(EEPROM.read(adr_eprom_init));
-  Serial.println("change it for default value upload!\n");
-  eepromDebugRead(); // Shows content of entire eeprom, except of empty areas
-}
-
-//
-// =======================================================================================================
 // MAIN ARDUINO SETUP (1x during startup)
 // =======================================================================================================
 //
@@ -1757,38 +1250,17 @@ void setup()
 
   // Serial setup
   Serial.begin(115200, SERIAL_8N1, DEBUG_RX, DEBUG_TX); // USB serial (for DEBUG) Mode, Rx pin (99 = not used), Tx pin
-
-  // ADC setup
-  battery.attach(BATTERY_DETECT_PIN);
-
+  
+/* ODiyGuYBrasil Usando Dabble Biblioteca*/
+  Dabble.begin("ODIYEsp32");
+/* Fim Dabble */
+ 
   // Print some system and software info to serial monitor
   delay(1000); // Give serial port/connection some time to get ready
   Serial.printf("\n**************************************************************************************************\n");
   Serial.printf("TheDIYGuy999 RC engine sound & light controller for ESP32 software version %s\n", codeVersion);
-  Serial.printf("https://github.com/TheDIYGuy999/Rc_Engine_Sound_ESP32\n");
-  Serial.printf("Please read carefully: https://github.com/TheDIYGuy999/Rc_Engine_Sound_ESP32/blob/master/README.md\n");
-  Serial.printf("XTAL Frequency: %i MHz, CPU Clock: %i MHz, APB Bus Clock: %i Hz\n", getXtalFrequencyMhz(), getCpuFrequencyMhz(), getApbFrequency());
-  Serial.printf("Internal RAM size: %i Byte, Free: %i Byte\n", ESP.getHeapSize(), ESP.getFreeHeap());
-  Serial.printf("WiFi MAC address: %s\n", WiFi.macAddress().c_str());
-  for (uint8_t coreNum = 0; coreNum < 2; coreNum++)
-  {
-    uint8_t resetReason = rtc_get_reset_reason(coreNum);
-    if (resetReason <= (sizeof(RESET_REASONS) / sizeof(RESET_REASONS[0])))
-    {
-      Serial.printf("Core %i reset reason: %i: %s\n", coreNum, rtc_get_reset_reason(coreNum), RESET_REASONS[resetReason - 1]);
-    }
-  }
-#if defined BATTERY_PROTECTION
-  Serial.printf("Battery protection calibration data:\n");
-  Serial.printf("RESISTOR_TO_BATTTERY_PLUS: %i Ω\n", RESISTOR_TO_BATTTERY_PLUS);
-  Serial.printf("RESISTOR_TO_GND: %i Ω\n", RESISTOR_TO_GND);
-  Serial.printf("DIODE_DROP: %.2f V\n", DIODE_DROP);
-#endif
-
+  
   Serial.printf("**************************************************************************************************\n\n");
-
-  // Eeprom Setup
-  setupEeprom();
 
   // Semaphores are useful to stop a Task proceeding, where it should be paused to wait,
   // because it is sharing a resource, such as the PWM variable.
@@ -1839,87 +1311,15 @@ void setup()
   shakerMotor.begin(SHAKER_MOTOR_PIN, 13, 20000); // Timer 13, 20kHz
 #endif
 
-  // Battery setup
-  setupBattery();
-
-  // ESP NOW setup
-  setupEspNow();
-
-#if defined SPI_DASHBOARD
-  // Dashboard setup
-  Serial.printf("SPI_DASHBOARD enabled. Pins 18 (sidelights), 19 (beacon2), 21 (beacon1), 23 (shaker) not usable!\n");
-  Serial.printf("-------------------------------------\n");
-  dashboard.init(dashRotation);
-#endif
-
-  // Neopixel setup
-#ifdef NEOPIXEL_ENABLED
-  FastLED.addLeds<NEOPIXEL, RGB_LEDS_PIN>(rgbLEDs, NEOPIXEL_COUNT);
-  FastLED.setCorrection(TypicalLEDStrip);
-  FastLED.setBrightness(NEOPIXEL_BRIGHTNESS);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_POWER_MILLIAMPS);
-#endif
-
   // Communication setup --------------------------------------------
   indicatorL.on();
   indicatorR.on();
 
-#if defined SBUS_COMMUNICATION // SBUS ----
+#if defined DABBLE_COMMUNICATION // SBUS ----
   if (MAX_RPM_PERCENTAGE > maxSbusRpmPercentage)
     MAX_RPM_PERCENTAGE = maxSbusRpmPercentage;                // Limit RPM range
-  sBus.begin(COMMAND_RX, COMMAND_TX, sbusInverted, sbusBaud); // begin SBUS communication with compatible receivers
+  //sBus.begin(COMMAND_RX, COMMAND_TX, sbusInverted, sbusBaud); // begin SBUS communication with compatible receivers
   setupMcpwm();                                               // mcpwm servo output setup
-
-#elif defined IBUS_COMMUNICATION // IBUS ----
-  if (MAX_RPM_PERCENTAGE > maxIbusRpmPercentage)
-    MAX_RPM_PERCENTAGE = maxIbusRpmPercentage;                 // Limit RPM range
-  iBus.begin(Serial2, IBUSBM_NOTIMER, COMMAND_RX, COMMAND_TX); // begin IBUS communication with compatible receivers
-  setupMcpwm();                                                // mcpwm servo output setup
-
-#elif defined PPM_COMMUNICATION // PPM ----
-  if (MAX_RPM_PERCENTAGE > maxPpmRpmPercentage)
-    MAX_RPM_PERCENTAGE = maxPpmRpmPercentage;                          // Limit RPM range
-  attachInterrupt(digitalPinToInterrupt(COMMAND_RX), readPpm, RISING); // begin PPM communication with compatible receivers
-  setupMcpwm();                                                        // mcpwm servo output setup
-
-#elif defined SUMD_COMMUNICATION // Graupner SUMD ----
-  // SUMD communication
-  if (MAX_RPM_PERCENTAGE > maxSumdRpmPercentage)
-    MAX_RPM_PERCENTAGE = maxSumdRpmPercentage; // Limit RPM range
-  sumd.begin(COMMAND_RX);                      // begin SUMD communication with compatible receivers
-  setupMcpwm();                                // mcpwm servo output setup
-
-#else
-  // PWM ----
-#define PWM_COMMUNICATION
-  if (MAX_RPM_PERCENTAGE > maxPwmRpmPercentage)
-    MAX_RPM_PERCENTAGE = maxPwmRpmPercentage; // Limit RPM range
-  for (uint8_t i = 0; i < PWM_CHANNELS_NUM; i++)
-  {
-    pinMode(PWM_PINS[i], INPUT_PULLDOWN);
-  }
-  // New: PWM read setup, using rmt. Thanks to croky-b
-  uint8_t i;
-  rmt_config_t rmt_channels[PWM_CHANNELS_NUM] = {};
-
-  for (i = 0; i < PWM_CHANNELS_NUM; i++)
-  {
-    rmt_channels[i].channel = (rmt_channel_t)PWM_CHANNELS[i];
-    rmt_channels[i].gpio_num = (gpio_num_t)PWM_PINS[i];
-    rmt_channels[i].clk_div = RMT_RX_CLK_DIV;
-    rmt_channels[i].mem_block_num = 1;
-    rmt_channels[i].rmt_mode = RMT_MODE_RX;
-    rmt_channels[i].rx_config.filter_en = true;
-    rmt_channels[i].rx_config.filter_ticks_thresh = 100; // Pulses shorter than this will be filtered out
-    rmt_channels[i].rx_config.idle_threshold = RMT_RX_MAX_US * RMT_TICK_PER_US;
-
-    rmt_config(&rmt_channels[i]);
-    rmt_set_rx_intr_en(rmt_channels[i].channel, true);
-    rmt_rx_start(rmt_channels[i].channel, 1);
-  }
-
-  rmt_isr_register(rmt_isr_handler, NULL, 0, NULL); // This is our interrupt
-
 #endif // -----------------------------------------------------------
 
   // Refresh sample intervals (important, because MAX_RPM_PERCENTAGE was probably changed above)
@@ -1955,57 +1355,18 @@ void setup()
   timerAlarmEnable(fixedTimer);                                // enable
 
   // wait for RC receiver to initialize
-  while (millis() <= 1000)
-    ;
+  //while (millis() <= 1000);
 
     // Read RC signals for the first time (used for offset calculations)
-#if defined SBUS_COMMUNICATION
-  sbusInit = false;
-  Serial.printf("Initializing SBUS (sbusInverted = %s, needs to be true for most standard radios) ...\n", sbusInverted ? "true" : "false");
-  Serial.printf("(Make sure radio and receiver are connected, turned on, bound and configured for SBUS output.)\n");
-  while (!sbusInit)
-  {
-    readSbusCommands();               // SBUS communication (pin 36)
-    indicatorL.flash(70, 75, 500, 3); // Show 3 fast flashes on indicators!
-    indicatorR.flash(70, 75, 500, 3);
+#if defined DABBLE_COMMUNICATION
+    //readDabbleCommands();               
+    indicatorL.flash(70, 75, 500, 5); // Show 3 fast flashes on indicators!
+    indicatorR.flash(70, 75, 500, 5);
     rtc_wdt_feed(); // Feed watchdog timer
-  }
-  Serial.printf("... SBUS initialization succesful!\n");
 
-#elif defined IBUS_COMMUNICATION
-  ibusInit = false;
-  Serial.printf("Initializing IBUS ...\n");
-  Serial.printf("(Make sure radio and receiver are connected, turned on, bound and configured for IBUS output.)\n");
-  while (!ibusInit)
-  {
-    readIbusCommands();               // IBUS communication (pin 36)
-    indicatorL.flash(70, 75, 500, 3); // Show 3 fast flashes on indicators!
-    indicatorR.flash(70, 75, 500, 3);
-    rtc_wdt_feed(); // Feed watchdog timer
-  }
-  Serial.printf("... IBUS initialization succesful!\n");
-
-#elif defined SUMD_COMMUNICATION
-  SUMD_init = false;
-  Serial.printf("Initializing SUMD ...\n");
-  Serial.printf("(Make sure radio and receiver are connected, turned on, bound and configured for SUMD output.)\n");
-  while (!SUMD_init)
-  {
-    readSumdCommands();
-    indicatorL.flash(70, 75, 500, 3); // Show 3 fast flashes on indicators!
-    indicatorR.flash(70, 75, 500, 3);
-    rtc_wdt_feed(); // Feed watchdog timer
-  }
-  Serial.printf("... SUMD initialization succesful!\n");
-
-#elif defined PPM_COMMUNICATION
-  readPpmCommands();
-#else
-  // measure PWM RC signals mark space ratio
-  readPwmSignals();
-  Serial.printf("... PWM communication mode active.\n");
+  Serial.printf("... DAbble iniciou com sucesso\n");
 #endif
-  Serial.printf("-------------------------------------\n");
+  //Serial.printf("-------------------------------------\n");
 
   // Calculate RC input signal ranges for all channels
   for (uint8_t i = 1; i < PULSE_ARRAY_SIZE; i++)
@@ -2055,261 +1416,39 @@ void dacOffsetFade()
   }
 }
 
-//
-// =======================================================================================================
-// READ PWM RC SIGNALS (plug in your channels according to order in "channelSetup.h")
-// =======================================================================================================
-//
-
-void readPwmSignals()
-{
-
-  static uint32_t lastFrameTime = millis();
-
-  if (millis() - lastFrameTime > 20)
-  { // Only do it every 20ms
-    // measure RC signal pulsewidth:
-    // nothing is done here, the PWM signals are now read, using the
-    // "static void IRAM_ATTR rmt_isr_handler(void* arg)" interrupt function
-
-    // NOTE: There is no channel mapping in this mode! Just plug in the wires in the order as defined in "2_adjustmentsRemote.h"
-    // for example: sound controller channel 2 (GEARBOX) connects to receiver channel 6
-
-    // See if we can obtain or "Take" the Semaphore.
-    // If the semaphore is not available, wait 1 ticks of the Scheduler to see if it becomes free.
-    if (xSemaphoreTake(xPwmSemaphore, portMAX_DELAY))
-    {
-      // We were able to obtain or "Take" the semaphore and can now access the shared resource.
-      // We want to have the pwmBuf variable for us alone,
-      // so we don't want it getting stolen during the middle of a conversion.
-      for (uint8_t i = 1; i < PWM_CHANNELS_NUM + 1; i++)
-      {
-        if (pwmBuf[i] > 500 && pwmBuf[i] < 2500)
-          pulseWidthRaw[i] = pwmBuf[i]; // Only take valid signals!
-      }
-
-      xSemaphoreGive(xPwmSemaphore); // Now free or "Give" the semaphore for others.
-    }
-
-    // Normalize, auto zero and reverse channels
-    processRawChannels();
-
-    // Failsafe for RC signals
-    failSafe = (pulseWidthRaw[3] < 500 || pulseWidthRaw[3] > 2500);
-    failsafeRcSignals();
-
-    lastFrameTime = millis();
-  }
-  else
-  {
-    xSemaphoreGive(xPwmSemaphore); // Free or "Give" the semaphore for others, if not required!
-  }
-}
-
-//
-// =======================================================================================================
-// READ PPM MULTI CHANNEL COMMMANDS (change the channel order in "2_adjustmentsRemote.h", if needed)
-// =======================================================================================================
-//
-
-void readPpmCommands()
-{
-
-  // NOTE: 8 channels is the maximum of this protocol!
-
-  pulseWidthRaw[1] = ppmBuf[STEERING - 1];   // CH1 steering
-  pulseWidthRaw[2] = ppmBuf[GEARBOX - 1];    // CH2 3 position switch for gearbox (left throttle in tracked mode)
-  pulseWidthRaw[3] = ppmBuf[THROTTLE - 1];   // CH3 throttle & brake
-  pulseWidthRaw[4] = ppmBuf[HORN - 1];       // CH5 jake brake, high / low beam, headlight flasher, engine on / off
-  pulseWidthRaw[5] = ppmBuf[FUNCTION_R - 1]; // CH5 jake brake, high / low beam, headlight flasher, engine on / off
-  pulseWidthRaw[6] = ppmBuf[FUNCTION_L - 1]; // CH6 indicators, hazards
-  pulseWidthRaw[7] = ppmBuf[POT2 - 1];       // CH7 pot 2
-  pulseWidthRaw[8] = ppmBuf[MODE1 - 1];      // CH8 mode 1 switch
-
-  // Normalize, auto zero and reverse channels
-  processRawChannels();
-
-  // Failsafe for RC signals
-  failSafe = (pulseWidthRaw[3] < 500 || pulseWidthRaw[3] > 2500);
-  failsafeRcSignals();
-}
-
-//
-// =======================================================================================================
-// READ SBUS SIGNALS (change the channel order in "2_adjustmentsRemote.h", if needed)
-// =======================================================================================================
-//
-
-void readSbusCommands()
+void readDabbleCommands()
 {
   // Signals are coming in via SBUS protocol
 
   static unsigned long lastSbusFailsafe;
 
-  // look for a good SBUS packet from the receiver
-#if not defined EMBEDDED_SBUS // ------------------------
-  if (sBus.read(&SBUSchannels[0], &SBUSfailSafe, &SBUSlostFrame))
-  {
-#else  // ------------------------------------------------
-  if (sBus.read() && !sBus.failsafe() && !sBus.lost_frame())
-  {
-#endif // -----------------------------------------------
-    sbusInit = true;
-    lastSbusFailsafe = millis();
-  }
-
-  // Failsafe triggering (works, if SBUS wire is unplugged, but SBUSfailSafe signal from the receiver is untested!)
-#if not defined EMBEDDED_SBUS // ------------------------
-  if (millis() - lastSbusFailsafe > sbusFailsafeTimeout && !SBUSfailSafe && !SBUSlostFrame)
-  {
-#else                // ------------------------------------------------
-  if (millis() - lastSbusFailsafe > sbusFailsafeTimeout)
-  {
-#endif               // -----------------------------------------------
-    failSafe = true; // if timeout (signal loss)
-  }
-  else
-    failSafe = false;
-
-  // SBUSchannels[NONE - 1] = 991; // The NONE channel needs to be on neutral (991 = 1500ms) TODO
-
-  // Proportional channels (in Microseconds)
-  if (!failSafe)
-  {
-#if defined EMBEDDED_SBUS // ----------------------------
-    SBUSchannels = sBus.ch();
-#endif                                                                                 // -----------------------------------------------
-    pulseWidthRaw[1] = map(SBUSchannels[STEERING - 1], 172, 1811, 1000, 2000);         // CH1 steering
-    pulseWidthRaw[2] = map(SBUSchannels[GEARBOX - 1], 172, 1811, 1000, 2000);          // CH2 3 position switch for gearbox (left throttle in tracked mode)
-    pulseWidthRaw[3] = map(SBUSchannels[THROTTLE - 1], 172, 1811, 1000, 2000);         // CH3 throttle & brake
-    pulseWidthRaw[4] = map(SBUSchannels[HORN - 1], 172, 1811, 1000, 2000);             // CH5 jake brake, high / low beam, headlight flasher, engine on / off
-    pulseWidthRaw[5] = map(SBUSchannels[FUNCTION_R - 1], 172, 1811, 1000, 2000);       // CH5 jake brake, high / low beam, headlight flasher, engine on / off
-    pulseWidthRaw[6] = map(SBUSchannels[FUNCTION_L - 1], 172, 1811, 1000, 2000);       // CH6 indicators, hazards
-    pulseWidthRaw[7] = map(SBUSchannels[POT2 - 1], 172, 1811, 1000, 2000);             // CH7 pot 2
-    pulseWidthRaw[8] = map(SBUSchannels[MODE1 - 1], 172, 1811, 1000, 2000);            // CH8 mode 1 switch
-    pulseWidthRaw[9] = map(SBUSchannels[MODE2 - 1], 172, 1811, 1000, 2000);            // CH9 mode 2 switch
-    pulseWidthRaw[10] = map(SBUSchannels[MOMENTARY1 - 1], 172, 1811, 1000, 2000);      // CH10
-    pulseWidthRaw[11] = map(SBUSchannels[HAZARDS - 1], 172, 1811, 1000, 2000);         // CH11
-    pulseWidthRaw[12] = map(SBUSchannels[INDICATOR_LEFT - 1], 172, 1811, 1000, 2000);  // CH12
-    pulseWidthRaw[13] = map(SBUSchannels[INDICATOR_RIGHT - 1], 172, 1811, 1000, 2000); // CH13
-  }
-
-  if (sbusInit)
-  {
-    // Normalize, auto zero and reverse channels
-    processRawChannels();
-
-    // Failsafe for RC signals
-    failsafeRcSignals();
-  }
+     failSafe = false;
+      if (!failSafe)
+      {
+       pulseWidthRaw[1] = 1500;         
+        pulseWidthRaw[2] = 1500;          
+        pulseWidthRaw[3] = map(y_axis, 172, 1811, 1000, 2000); 
+        Serial.printf("pulseWidthRaw[3]: %i \n", pulseWidthRaw[3]);        
+        pulseWidthRaw[4] = 1500;             
+        pulseWidthRaw[5] = 1500;       
+        pulseWidthRaw[6] = 1500;       
+        pulseWidthRaw[7] = 1500;             
+        pulseWidthRaw[8] = 1500;            
+        pulseWidthRaw[9] = 1500;            
+        pulseWidthRaw[10] = 1500;      
+        pulseWidthRaw[11] = 1500;         
+        pulseWidthRaw[12] = 1500;  
+        pulseWidthRaw[13] = 1500; 
+     }
+     if (pulseWidthRaw[3] == 1461){
+        pulseWidthRaw[3] = 1500;
+     }
+     for (uint8_t i = 1; i < PULSE_ARRAY_SIZE; i++){
+         pulseWidth[i] = pulseWidthRaw[i];
+     }
 }
 
-//
-// =======================================================================================================
-// READ IBUS SIGNALS (change the channel order in "2_adjustmentsRemote.h", if needed).
-// =======================================================================================================
-//
 
-// NOTE: "MAX_RPM_PERCENTAGE" > 350 will crash the ESP32, if used in iBus mode!
-// Caution, this protocoll does NOT offer failsafe!! Bad contact on iBUS wire = crash!
-// Better use SBUS instead, if available!
-
-// IBUS Loop sub function ----
-void loopIbus()
-{
-  // Loop iBus (read signals)
-  static unsigned long lastIbusRead;
-  static uint16_t iBusReadCycles;
-  if (millis() - lastIbusRead > 10)
-  { // Every 10ms
-    lastIbusRead = millis();
-    iBus.loop();
-    if (iBusReadCycles < 100)
-      iBusReadCycles++;
-    else
-      ibusInit = true; // We need to process the entire serial package, before we read the channels for the first time! 100 OK? TODO
-  }
-}
-
-// Read IBUS signals ----
-void readIbusCommands()
-{
-
-  // Loop iBus (fill buffer)
-  loopIbus();
-
-  // NOTE: The channel mapping is in the order as defined in "channelsetup.h"
-  // for example: sound controller channel 2 (GEARBOX) connects to receiver channel 6
-
-  // Proportional channels (in Microseconds)
-  pulseWidthRaw[1] = iBus.readChannel(STEERING - 1);         // CH1 steering
-  pulseWidthRaw[2] = iBus.readChannel(GEARBOX - 1);          // CH2 3 position switch for gearbox (left throttle in tracked mode)
-  pulseWidthRaw[3] = iBus.readChannel(THROTTLE - 1);         // CH3 throttle & brake
-  pulseWidthRaw[4] = iBus.readChannel(HORN - 1);             // CH5 jake brake, high / low beam, headlight flasher, engine on / off
-  pulseWidthRaw[5] = iBus.readChannel(FUNCTION_R - 1);       // CH5 jake brake, high / low beam, headlight flasher, engine on / off
-  pulseWidthRaw[6] = iBus.readChannel(FUNCTION_L - 1);       // CH6 indicators, hazards
-  pulseWidthRaw[7] = iBus.readChannel(POT2 - 1);             // CH7 pot 2
-  pulseWidthRaw[8] = iBus.readChannel(MODE1 - 1);            // CH8 mode 1 switch
-  pulseWidthRaw[9] = iBus.readChannel(MODE2 - 1);            // CH9 mode 2 switch
-  pulseWidthRaw[10] = iBus.readChannel(MOMENTARY1 - 1);      // CH10
-  pulseWidthRaw[11] = iBus.readChannel(HAZARDS - 1);         // CH11
-  pulseWidthRaw[12] = iBus.readChannel(INDICATOR_LEFT - 1);  // CH12
-  pulseWidthRaw[13] = iBus.readChannel(INDICATOR_RIGHT - 1); // CH13
-
-  if (ibusInit)
-  {
-    // Normalize, auto zero and reverse channels
-    processRawChannels();
-  }
-}
-
-//
-// =======================================================================================================
-// READ SUMD SIGNALS (change the channel order in "2_adjustmentsRemote.h", if needed).
-// =======================================================================================================
-//
-void readSumdCommands()
-{
-#if defined SUMD_COMMUNICATION
-  // Signals are coming in via Graupner SUMD protocol
-
-  // look for a good SUMD packet from the receiver
-  if (sumd.read(SUMDchannels, &SUMD_failsafe, &SUMD_frame_lost) == 0)
-  {
-    SUMD_init = true;
-  }
-
-  // Proportional channels (in Microseconds)
-  pulseWidthRaw[1] = map(SUMDchannels[STEERING - 1], 1100, 1900, 1000, 2000);    // CH1 steering
-  pulseWidthRaw[2] = map(SUMDchannels[GEARBOX - 1], 1100, 1900, 1000, 2000);     // CH2 3 position switch for gearbox (left throttle in tracked mode)
-  pulseWidthRaw[3] = map(SUMDchannels[THROTTLE - 1], 1100, 1900, 1000, 2000);    // CH3 throttle & brake
-  pulseWidthRaw[4] = map(SUMDchannels[HORN - 1], 1100, 1900, 1000, 2000);        // CH5 jake brake, high / low beam, headlight flasher, engine on / off
-  pulseWidthRaw[5] = map(SUMDchannels[FUNCTION_R - 1], 1100, 1900, 1000, 2000);  // CH5 jake brake, high / low beam, headlight flasher, engine on / off
-  pulseWidthRaw[6] = map(SUMDchannels[FUNCTION_L - 1], 1100, 1900, 1000, 2000);  // CH6 indicators, hazards
-  pulseWidthRaw[7] = map(SUMDchannels[POT2 - 1], 1100, 1900, 1000, 2000);        // CH7 pot 2
-  pulseWidthRaw[8] = map(SUMDchannels[MODE1 - 1], 1100, 1900, 1000, 2000);       // CH8 mode 1 switch
-  pulseWidthRaw[9] = map(SUMDchannels[MODE2 - 1], 1100, 1900, 1000, 2000);       // CH9 mode 2 switch
-  pulseWidthRaw[10] = map(SUMDchannels[MOMENTARY1 - 1], 1100, 1900, 1000, 2000); // CH10
-  pulseWidthRaw[11] = map(SUMDchannels[HAZARDS - 1], 1100, 1900, 1000, 2000);    // CH11
-
-  // Failsafe triggering
-  if (SUMD_failsafe)
-  {
-    failSafe = true; // in most cases the rx buffer is not processed fast enough so old data is overwritten
-  }
-  else
-    failSafe = false;
-
-  if (SUMD_init)
-  { // TODO, experimental!
-    // Normalize, auto zero and reverse channels
-    processRawChannels();
-
-    // Failsafe for RC signals
-    failsafeRcSignals();
-  }
-#endif
-}
 
 //
 // =======================================================================================================
@@ -2343,7 +1482,7 @@ void processRawChannels()
       if (channelAutoZero[i] && !autoZeroDone && (pulseWidthRaw[i] > 1600 || pulseWidthRaw[i] < 1400))
       {
         channel = i;
-        Serial.printf(" CH%i: signal out of auto calibration range, check transmitter & receiver!\n", channel);
+       // Serial.printf(" CH%i: signal out of auto calibration range, check transmitter & receiver!\n", channel);
         channelZero();
         lastOutOfRangeMillis = millis();
         i--;
@@ -2354,7 +1493,7 @@ void processRawChannels()
 #ifdef EXPONENTIAL_THROTTLE
       if (!exThrottlePrint)
       {
-        Serial.printf("EXPONENTIAL_THROTTLE mode enabled\n");
+      //  Serial.printf("EXPONENTIAL_THROTTLE mode enabled\n");
         exThrottlePrint = true;
       }
       if (i == 3)
@@ -2373,7 +1512,7 @@ void processRawChannels()
 #ifdef EXPONENTIAL_STEERING
       if (!exSteeringPrint)
       {
-        Serial.printf("EXPONENTIAL_STEERING mode enabled\n");
+       // Serial.printf("EXPONENTIAL_STEERING mode enabled\n");
         exSteeringPrint = true;
       }
       if (i == 1)
@@ -2410,13 +1549,12 @@ void processRawChannels()
 
       // Compensate pulsewidth with auto zero offset
       pulseWidthRaw3[i] += pulseOffset[i];
-      if (!autoZeroDone)
-      { // Print offsets, if switching on the controller
+      /*if (!autoZeroDone){ // Print offsets, if switching on the controller
         if (i == 1)
           Serial.printf("\nTransmitter channel offsets (calculated, if channelAutoZero[] = true):\n");
         if (channelAutoZero[i])
           Serial.printf(" CH%i: %i µs\n", i, pulseOffset[i]);
-      }
+      }*/
 
       // Set auto zero done flag
       if (i == PULSE_ARRAY_SIZE - 1)
@@ -2461,38 +1599,6 @@ void processRawChannels()
     pulseWidth[i] = pulseWidthRaw3[i];
   }
 #endif
-
-  // Print input signal debug infos -----------------------------------------------------------------------------
-#ifdef CHANNEL_DEBUG // can slow down the playback loop!
-  static unsigned long printChannelMillis;
-  if (millis() - printChannelMillis > 1000 && autoZeroDone)
-  { // Every 1000ms
-    printChannelMillis = millis();
-
-    Serial.printf("CHANNEL_DEBUG:\n");
-    for (uint8_t channelNum = 1; channelNum < PULSE_ARRAY_SIZE; channelNum++)
-    {
-      Serial.printf(" CH%i: %i µs\n", channelNum, pulseWidth[channelNum]);
-    }
-    Serial.printf("Throttle: %i/%i\n", currentThrottle, maxRpm);
-    Serial.printf("States:\n");
-    Serial.printf(" MODE1:            %s\n", mode1 ? "true" : "false");
-    Serial.printf(" MODE2:            %s\n", mode2 ? "true" : "false");
-    Serial.printf(" MOMENTARY1:       %s\n", momentary1 ? "true" : "false");
-    Serial.printf(" HAZARDS:          %s\n", hazard ? "true" : "false");
-    Serial.printf(" INDICATOR_LEFT:   %s\n", indicatorLon ? "true" : "false");
-    Serial.printf(" INDICATOR_RIGHT:  %s\n", indicatorRon ? "true" : "false");
-#if not defined EMBEDDED_SBUS // ------------------------
-    Serial.printf(" SBUS Failsafe:    %s\n", SBUSfailSafe ? "true" : "false");
-    Serial.printf(" SBUS Lost frames: %s\n", SBUSlostFrame ? "true" : "false");
-#endif // -----------------------------------------------
-    Serial.printf(" Failsafe state:   %s\n", failSafe ? "true" : "false");
-    Serial.printf("Misc:\n");
-    Serial.printf(" MAX_RPM_PERCENTAGE: %i\n", MAX_RPM_PERCENTAGE);
-    Serial.printf(" loopTime:           %i\n", loopTime);
-    Serial.printf("-----------------------------------\n");
-  }
-#endif // CHANNEL_DEBUG
 }
 
 // Sub function for channel centering ----
@@ -2532,18 +1638,6 @@ void failsafeRcSignals()
 
 bool beaconControl(uint8_t pulses)
 {
-
-  /* Beacons: "RC DIY LED Rotating Beacon Light Flash For 1/10 Truck Crawler Toy"
-      from: https://www.ebay.ch/itm/303979210629
-      States (every servo signal change from 1000 to 2000us will switch to the next state):
-      0 rotating beacon slow
-      1 Rotating beacon slow
-      2 4x flash
-      3 endless flash
-      4 off
-
-  */
-
   static unsigned long pulseMillis;
   static unsigned long pulseWidth = CH3L;
   static uint8_t i;
@@ -2711,241 +1805,7 @@ void mcpwmOutput()
       couplerServoMicros = CH4L;
     mcpwm_set_duty_in_us(MCPWM_UNIT_0, MCPWM_TIMER_1, MCPWM_OPR_A, couplerServoMicros);
   }
-
-  // Print servo signal debug infos **********************
-  static unsigned long printServoMillis;
-#ifdef SERVO_DEBUG // can slow down the playback loop!
-  if (millis() - printServoMillis > 1000)
-  { // Every 1000ms
-    printServoMillis = millis();
-
-    Serial.printf("SERVO_DEBUG:\n");
-    Serial.printf("CH1 (steering) :  %i µS, %.2f°\n", steeringServoMicrosDelayed, us2degree(steeringServoMicrosDelayed));
-    Serial.printf("CH2 (shifting) :  %i µS, %.2f°\n", shiftingServoMicros, us2degree(shiftingServoMicros));
-
-#if defined MODE2_WINCH
-    Serial.printf("CH3 (winch)    :  %i µS, %f°\n", winchServoMicros, us2degree(winchServoMicros));
-#endif
-
-#if defined CH3_BEACON
-    Serial.printf("CH3 (beacon)    :  %i µS, %f°\n", beaconServoMicros, us2degree(beaconServoMicros));
-#endif
-
-    Serial.printf("CH4 (5th wheel):  %i µS, %.2f°\n", couplerServoMicros, us2degree(couplerServoMicros));
-    Serial.printf("-------------------------------------\n");
-  }
-#endif // SERVO_DEBUG
 }
-
-//
-// =======================================================================================================
-// DISABLE INTERRUPTS
-// =======================================================================================================
-//
-
-// it is required to disable interrupts prior to EEPROM access!
-void disableAllInterrupts()
-{
-
-  timerDetachInterrupt(variableTimer);
-  timerDetachInterrupt(fixedTimer);
-
-  Serial.print("Interrupts disabled, reboot required!");
-}
-
-//
-// =======================================================================================================
-// EEPROM
-// =======================================================================================================
-//
-
-// Write string to EEPROM ------
-// https://roboticsbackend.com/arduino-write-string-in-eeprom/#Write_the_String
-
-int writeStringToEEPROM(int addrOffset, const String &strToWrite)
-{
-  byte len = strToWrite.length();
-  EEPROM.write(addrOffset, len);
-  for (int i = 0; i < len; i++)
-  {
-    EEPROM.write(addrOffset + 1 + i, strToWrite[i]);
-  }
-  return addrOffset + 1 + len;
-}
-
-// Read string from EEPROM ------
-int readStringFromEEPROM(int addrOffset, String *strToRead)
-{
-  int newStrLen = EEPROM.read(addrOffset);
-  char data[newStrLen + 1];
-  for (int i = 0; i < newStrLen; i++)
-  {
-    data[i] = EEPROM.read(addrOffset + 1 + i);
-  }
-  data[newStrLen] = '\0';
-  *strToRead = String(data);
-  return addrOffset + 1 + newStrLen;
-}
-
-// Erase EEPROM ------
-void eepromErase()
-{
-  for (int i = 0; i < EEPROM_SIZE; i++)
-  {
-    EEPROM.write(i, 0);
-  }
-  EEPROM.commit();
-  Serial.println("EEPROM erased!");
-  delay(500);
-  eepromDebugRead();
-}
-
-// Init new board with the default values you want ------
-void eepromInit()
-{
-  if (EEPROM.read(adr_eprom_init) != eeprom_id)
-  { // Only do init, if ID has changed!
-    EEPROM.write(adr_eprom_init, eeprom_id);
-
-    EEPROM.write(adr_eprom_useTrailer1, defaultUseTrailer1);
-    EEPROM.write(adr_eprom_Trailer1Mac0, defaultBroadcastAddress1[0]); // Should always be 0xFE!
-    EEPROM.write(adr_eprom_Trailer1Mac1, defaultBroadcastAddress1[1]); // Country number
-    EEPROM.write(adr_eprom_Trailer1Mac2, defaultBroadcastAddress1[2]); // Region number
-    EEPROM.write(adr_eprom_Trailer1Mac3, defaultBroadcastAddress1[3]); // User Number 1
-    EEPROM.write(adr_eprom_Trailer1Mac4, defaultBroadcastAddress1[4]); // User Number 2
-    EEPROM.write(adr_eprom_Trailer1Mac5, defaultBroadcastAddress1[5]); // 0x01 = trailer #1
-
-    EEPROM.write(adr_eprom_useTrailer2, defaultUseTrailer2);
-    EEPROM.write(adr_eprom_Trailer2Mac0, defaultBroadcastAddress2[0]); // Should always be 0xFE!
-    EEPROM.write(adr_eprom_Trailer2Mac1, defaultBroadcastAddress2[1]); // Country number
-    EEPROM.write(adr_eprom_Trailer2Mac2, defaultBroadcastAddress2[2]); // Region number
-    EEPROM.write(adr_eprom_Trailer2Mac3, defaultBroadcastAddress2[3]); // User Number 1
-    EEPROM.write(adr_eprom_Trailer2Mac4, defaultBroadcastAddress2[4]); // User Number 2
-    EEPROM.write(adr_eprom_Trailer2Mac5, defaultBroadcastAddress2[5]); // 0x02 = trailer #2
-
-    EEPROM.write(adr_eprom_useTrailer3, defaultUseTrailer3);
-    EEPROM.write(adr_eprom_Trailer3Mac0, defaultBroadcastAddress3[0]); // Should always be 0xFE!
-    EEPROM.write(adr_eprom_Trailer3Mac1, defaultBroadcastAddress3[1]); // Country number
-    EEPROM.write(adr_eprom_Trailer3Mac2, defaultBroadcastAddress3[2]); // Region number
-    EEPROM.write(adr_eprom_Trailer3Mac3, defaultBroadcastAddress3[3]); // User Number 1
-    EEPROM.write(adr_eprom_Trailer3Mac4, defaultBroadcastAddress3[4]); // User Number 2
-    EEPROM.write(adr_eprom_Trailer3Mac5, defaultBroadcastAddress3[5]); // 0x02 = trailer #2
-
-    // EEPROM.write(adr_eprom_fifthWhweelDetectionActive, defaulFifthWhweelDetectionActive);
-    // EEPROM.write(adr_eprom_tailLightBrightness, defaultLightsBrightness);
-    // EEPROM.write(adr_eprom_sideLightBrightness, defaultLightsBrightness);
-    // EEPROM.write(adr_eprom_reversingLightBrightness, defaultLightsBrightness);
-    // EEPROM.write(adr_eprom_indicatorLightBrightness, defaultLightsBrightness);
-    writeStringToEEPROM(adr_eprom_ssid, default_ssid);
-    writeStringToEEPROM(adr_eprom_password, default_password);
-    EEPROM.commit();
-    Serial.println("EEPROM initialized.");
-  }
-}
-
-// Write new values to EEPROM ------
-void eepromWrite()
-{
-
-  disableAllInterrupts();
-
-  EEPROM.write(adr_eprom_useTrailer1, useTrailer1);
-  EEPROM.write(adr_eprom_Trailer1Mac0, broadcastAddress1[0]); // Should always be 0xFE!
-  EEPROM.write(adr_eprom_Trailer1Mac1, broadcastAddress1[1]); // Country number
-  EEPROM.write(adr_eprom_Trailer1Mac2, broadcastAddress1[2]); // Region number
-  EEPROM.write(adr_eprom_Trailer1Mac3, broadcastAddress1[3]); // User Number 1
-  EEPROM.write(adr_eprom_Trailer1Mac4, broadcastAddress1[4]); // User Number 2
-  EEPROM.write(adr_eprom_Trailer1Mac5, broadcastAddress1[5]); // 0x01 = trailer #1
-
-  EEPROM.write(adr_eprom_useTrailer2, useTrailer2);
-  EEPROM.write(adr_eprom_Trailer2Mac0, broadcastAddress2[0]); // Should always be 0xFE!
-  EEPROM.write(adr_eprom_Trailer2Mac1, broadcastAddress2[1]); // Country number
-  EEPROM.write(adr_eprom_Trailer2Mac2, broadcastAddress2[2]); // Region number
-  EEPROM.write(adr_eprom_Trailer2Mac3, broadcastAddress2[3]); // User Number 1
-  EEPROM.write(adr_eprom_Trailer2Mac4, broadcastAddress2[4]); // User Number 2
-  EEPROM.write(adr_eprom_Trailer2Mac5, broadcastAddress2[5]); // 0x02 = trailer #2
-
-  EEPROM.write(adr_eprom_useTrailer3, useTrailer3);
-  EEPROM.write(adr_eprom_Trailer3Mac0, broadcastAddress3[0]); // Should always be 0xFE!
-  EEPROM.write(adr_eprom_Trailer3Mac1, broadcastAddress3[1]); // Country number
-  EEPROM.write(adr_eprom_Trailer3Mac2, broadcastAddress3[2]); // Region number
-  EEPROM.write(adr_eprom_Trailer3Mac3, broadcastAddress3[3]); // User Number 1
-  EEPROM.write(adr_eprom_Trailer3Mac4, broadcastAddress3[4]); // User Number 2
-  EEPROM.write(adr_eprom_Trailer3Mac5, broadcastAddress3[5]); // 0x02 = trailer #2
-
-  // EEPROM.write(adr_eprom_fifthWhweelDetectionActive, fifthWhweelDetectionActive);
-  // EEPROM.write(adr_eprom_tailLightBrightness, tailLightBrightness);
-  // EEPROM.write(adr_eprom_sideLightBrightness, sideLightBrightness);
-  // EEPROM.write(adr_eprom_reversingLightBrightness, reversingLightBrightness);
-  // EEPROM.write(adr_eprom_indicatorLightBrightness, indicatorLightBrightness);
-  writeStringToEEPROM(adr_eprom_ssid, ssid);
-  writeStringToEEPROM(adr_eprom_password, password);
-  EEPROM.commit();
-  Serial.println("EEPROM written.");
-  eepromDebugRead();
-}
-
-// Read values from EEPROM ------
-void eepromRead()
-{
-  useTrailer1 = EEPROM.read(adr_eprom_useTrailer1);
-  broadcastAddress1[0] = EEPROM.read(adr_eprom_Trailer1Mac0);
-  broadcastAddress1[1] = EEPROM.read(adr_eprom_Trailer1Mac1);
-  broadcastAddress1[2] = EEPROM.read(adr_eprom_Trailer1Mac2);
-  broadcastAddress1[3] = EEPROM.read(adr_eprom_Trailer1Mac3);
-  broadcastAddress1[4] = EEPROM.read(adr_eprom_Trailer1Mac4);
-  broadcastAddress1[5] = EEPROM.read(adr_eprom_Trailer1Mac5);
-
-  useTrailer2 = EEPROM.read(adr_eprom_useTrailer2);
-  broadcastAddress2[0] = EEPROM.read(adr_eprom_Trailer2Mac0);
-  broadcastAddress2[1] = EEPROM.read(adr_eprom_Trailer2Mac1);
-  broadcastAddress2[2] = EEPROM.read(adr_eprom_Trailer2Mac2);
-  broadcastAddress2[3] = EEPROM.read(adr_eprom_Trailer2Mac3);
-  broadcastAddress2[4] = EEPROM.read(adr_eprom_Trailer2Mac4);
-  broadcastAddress2[5] = EEPROM.read(adr_eprom_Trailer2Mac5);
-
-  useTrailer3 = EEPROM.read(adr_eprom_useTrailer3);
-  broadcastAddress3[0] = EEPROM.read(adr_eprom_Trailer3Mac0);
-  broadcastAddress3[1] = EEPROM.read(adr_eprom_Trailer3Mac1);
-  broadcastAddress3[2] = EEPROM.read(adr_eprom_Trailer3Mac2);
-  broadcastAddress3[3] = EEPROM.read(adr_eprom_Trailer3Mac3);
-  broadcastAddress3[4] = EEPROM.read(adr_eprom_Trailer3Mac4);
-  broadcastAddress3[5] = EEPROM.read(adr_eprom_Trailer3Mac5);
-
-  // fifthWhweelDetectionActive = EEPROM.read(adr_eprom_fifthWhweelDetectionActive);
-  // tailLightBrightness = EEPROM.read(adr_eprom_tailLightBrightness);
-  // sideLightBrightness = EEPROM.read(adr_eprom_sideLightBrightness);
-  // reversingLightBrightness = EEPROM.read(adr_eprom_reversingLightBrightness);
-  // indicatorLightBrightness = EEPROM.read(adr_eprom_indicatorLightBrightness);
-  readStringFromEEPROM(adr_eprom_ssid, &ssid);
-  readStringFromEEPROM(adr_eprom_password, &password);
-
-  Serial.println("EEPROM read.");
-}
-
-void eepromDebugRead()
-{
-#if defined DEBUG
-  String eepromDebug;
-  Serial.println("EEPROM debug dump begin **********************************************");
-  eepromDebug = "";
-  for (int i = 0; i < EEPROM_SIZE; ++i)
-  {
-    eepromDebug += char(EEPROM.read(i));
-  }
-  Serial.println(eepromDebug);
-  Serial.println("");
-  Serial.println("EEPROM debug dump end ************************************************");
-#endif
-}
-
-//
-// =======================================================================================================
-// WEB INTERFACE
-// =======================================================================================================
-//
-
-#include "src/webInterface.h" // Configuration website
 
 //
 // =======================================================================================================
@@ -2989,20 +1849,6 @@ void mapThrottle()
 
   // Mixing both sides together (take the bigger value)
   currentThrottle = max(currentThrottleLR[2], currentThrottleLR[3]);
-
-  // Print debug infos
-  static unsigned long printTrackedMillis;
-#ifdef TRACKED_DEBUG // can slow down the playback loop!
-  if (millis() - printTrackedMillis > 1000)
-  { // Every 1000ms
-    printTrackedMillis = millis();
-
-    Serial.printf("TRACKED DEBUG:\n");
-    Serial.printf("currentThrottleLR[2]: %i\n", currentThrottleLR[2]);
-    Serial.printf("currentThrottleLR[3]: %i\n", currentThrottleLR[3]);
-    Serial.printf("currentThrottle: %i\n", currentThrottle);
-  }
-#endif // TRACKED_DEBUG
 
 #elif defined EXCAVATOR_MODE // Excavator mode ----------------------------------------------
 
@@ -3058,7 +1904,6 @@ void mapThrottle()
   }
 
 #else // Normal mode ---------------------------------------------------------------------------
-
   // check if the pulsewidth looks like a servo pulse
   if (pulseWidth[3] > pulseMinLimit[3] && pulseWidth[3] < pulseMaxLimit[3])
   {
@@ -3615,10 +2460,10 @@ void led()
 #endif
 
 #ifdef HAZARDS_WHILE_5TH_WHEEL_UNLOCKED
-  if (!hazard && !unlock5thWheel && !batteryProtection)
+  if (!hazard && !unlock5thWheel)
   { // Hazards also active, if 5th wheel unlocked
 #else
-  if (!hazard && !batteryProtection)
+  if (!hazard)
   {
 #endif
     if (indicatorLon)
@@ -3783,12 +2628,6 @@ void led()
   } // End of state machine
 #endif // End of manual lights mode ************************
 }
-
-//
-// =======================================================================================================
-// SHAKER (simulates engine vibrations)
-// =======================================================================================================
-//
 
 void shaker()
 {
@@ -3956,24 +2795,6 @@ void gearboxDetection()
     previousReverse = escInReverse;
     shiftingTrigger = true; // Play shifting sound
   }
-
-#ifdef MANUAL_TRANS_DEBUG
-  static unsigned long manualTransDebugMillis;
-  if (millis() - manualTransDebugMillis > 100)
-  {
-    manualTransDebugMillis = millis();
-    Serial.printf("MANUAL_TRANS_DEBUG:\n");
-    Serial.printf("currentThrottle: %i\n", currentThrottle);
-    Serial.printf("selectedGear: %i\n", selectedGear);
-    Serial.printf("overdrive: %i\n", overdrive);
-    Serial.printf("engineLoad: %i\n", engineLoad);
-    Serial.printf("sequentialLock: %s\n", sequentialLock ? "true" : "false");
-    Serial.printf("currentRpm: %i\n", currentRpm);
-    Serial.printf("currentSpeed: %i\n", currentSpeed);
-    Serial.printf("---------------------------------\n");
-  }
-#endif // MANUAL_TRANS_DEBUG
-
 #endif // End of not TRACKED_MODE -----------------------------------------------------------------------
 }
 
@@ -4028,17 +2849,6 @@ void automaticGearSelector()
 
       selectedAutomaticGear = constrain(selectedAutomaticGear, 1, NumberOfAutomaticGears);
     }
-
-#ifdef AUTO_TRANS_DEBUG
-    Serial.printf("AUTO_TRANS_DEBUG:\n");
-    Serial.printf("currentThrottle: %i\n", currentThrottle);
-    Serial.printf("selectedAutomaticGear: %i\n", selectedAutomaticGear);
-    Serial.printf("engineLoad: %i\n", engineLoad);
-    Serial.printf("upShiftPoint: %i\n", upShiftPoint);
-    Serial.printf("_currentRpm: %i\n", _currentRpm);
-    Serial.printf("downShiftPoint: %i\n", downShiftPoint);
-    Serial.printf("-----------------------------------\n");
-#endif
   }
 }
 
@@ -4092,33 +2902,6 @@ int8_t escPulse()
 
 void esc()
 { // ESC main function ================================
-
-  // Battery protection --------------------------------
-#if defined BATTERY_PROTECTION
-  static unsigned long lastBatteryTime;
-  static bool outOfFuelMessageLock;
-  if (millis() - lastBatteryTime > 300)
-  { // Check battery voltage every 300ms
-    lastBatteryTime = millis();
-    batteryVoltage = batteryVolts(); // Store voltage in global variable (also used in dashboard)
-    if (batteryVoltage < batteryCutoffvoltage)
-    {
-      Serial.printf("Battery protection triggered, slowing down! Battery: %.2f V Threshold: %.2f V \n", batteryVoltage, batteryCutoffvoltage);
-      Serial.printf("Disconnect battery to prevent it from overdischarging!\n", batteryVoltage, batteryCutoffvoltage);
-      batteryProtection = true;
-    }
-    if (batteryVoltage > batteryCutoffvoltage + (FULLY_CHARGED_VOLTAGE * numberOfCells))
-    { // Recovery hysteresis
-      batteryProtection = false;
-    }
-    // Out of fuel message triggering
-    if (batteryProtection && !outOfFuelMessageLock)
-    {
-      outOfFuelMessageTrigger = true;
-      outOfFuelMessageLock = true; // only trigger message once
-    }
-  }
-#endif // --------------------------------------------
 
 #if not defined TRACKED_MODE && not defined AIRPLANE_MODE // No ESC control in TRACKED_MODE or in AIRPLANE_MODE
   // Gear dependent ramp speed for acceleration & deceleration
@@ -4180,43 +2963,12 @@ void esc()
 
   // Additional brake detection signal, applied immediately. Used to prevent sound issues, if braking very quickly
   brakeDetect = ((pulse() == 1 && escPulse() == -1) || (pulse() == -1 && escPulse() == 1));
-
-#ifdef ESC_DEBUG
-  if (millis() - lastStateTime > 300)
-  { // Print the data every 300ms
-    lastStateTime = millis();
-    Serial.printf("ESC_DEBUG:\n");
-    Serial.printf("driveState:            %i\n", driveState);
-    Serial.printf("pulse():               %i\n", pulse());
-    Serial.printf("escPulse():            %i\n", escPulse());
-    Serial.printf("brakeDetect:           %s\n", brakeDetect ? "true" : "false");
-    Serial.printf("escPulseMin:           %i\n", escPulseMin);
-    Serial.printf("escPulseMinNeutral:    %i\n", escPulseMinNeutral);
-    Serial.printf("escPulseMaxNeutral:    %i\n", escPulseMaxNeutral);
-    Serial.printf("escPulseMax:           %i\n", escPulseMax);
-    Serial.printf("brakeRampRate:         %i\n", brakeRampRate);
-    Serial.printf("lowRange:              %s\n", lowRange ? "true" : "false");
-    Serial.printf("currentRpm:            %i\n", currentRpm);
-    Serial.printf("escPulseWidth:         %i\n", escPulseWidth);
-    Serial.printf("escPulseWidthOut:      %i\n", escPulseWidthOut);
-    Serial.printf("escSignal:             %i\n", escSignal);
-    Serial.printf("motorDriverDuty:       %i\n", motorDriverDuty);
-    Serial.printf("currentSpeed:          %i\n", currentSpeed);
-    Serial.printf("speedLimit:            %i\n", speedLimit);
-    Serial.printf("batteryProtection:     %s\n", batteryProtection ? "true" : "false");
-    Serial.printf("batteryVoltage:        %.2f\n", batteryVoltage);
-    Serial.printf("--------------------------------------\n");
-  }
-#endif // ESC_DEBUG
-
-  if (millis() - escMillis > escRampTime)
+ if (millis() - escMillis > escRampTime)
   { // About very 20 - 75ms
     escMillis = millis();
-
     // Drive state state machine **********************************************************************************
     switch (driveState)
     {
-
     case 0: // Standing still ---------------------------------------------------------------------
       escIsBraking = false;
       escInReverse = false;
@@ -4225,7 +2977,6 @@ void esc()
 #ifdef VIRTUAL_16_SPEED_SEQUENTIAL
       selectedGear = 1;
 #endif
-
       if (pulse() == 1 && engineRunning && !neutralGear)
         driveState = 1; // Driving forward
       if (pulse() == -1 && engineRunning && !neutralGear)
@@ -4236,14 +2987,14 @@ void esc()
       escIsBraking = false;
       escInReverse = false;
       escIsDriving = true;
-      if (escPulseWidth < pulseWidth[3] && currentSpeed < speedLimit && !batteryProtection)
+      if (escPulseWidth < pulseWidth[3] && currentSpeed < speedLimit)
       {
         if (escPulseWidth >= escPulseMaxNeutral)
           escPulseWidth += (driveRampRate * driveRampGain); // Faster
         else
           escPulseWidth = escPulseMaxNeutral; // Initial boost
       }
-      if ((escPulseWidth > pulseWidth[3] || batteryProtection) && escPulseWidth > pulseZero[3])
+      if ((escPulseWidth > pulseWidth[3]) && escPulseWidth > pulseZero[3])
         escPulseWidth -= (driveRampRate * driveRampGain); // Slower
 
       if (gearUpShiftingPulse && shiftingAutoThrottle && !automatic && !doubleClutch)
@@ -4300,14 +3051,14 @@ void esc()
       escIsBraking = false;
       escInReverse = true;
       escIsDriving = true;
-      if (escPulseWidth > pulseWidth[3] && currentSpeed < speedLimit && !batteryProtection)
+      if (escPulseWidth > pulseWidth[3] && currentSpeed < speedLimit)
       {
         if (escPulseWidth <= escPulseMinNeutral)
           escPulseWidth -= (driveRampRate * driveRampGain); // Faster
         else
           escPulseWidth = escPulseMinNeutral; // Initial boost
       }
-      if ((escPulseWidth < pulseWidth[3] || batteryProtection) && escPulseWidth < pulseZero[3])
+      if ((escPulseWidth < pulseWidth[3]) && escPulseWidth < pulseZero[3])
         escPulseWidth += (driveRampRate * driveRampGain); // Slower
 
       if (gearUpShiftingPulse && shiftingAutoThrottle && !automatic && !doubleClutch)
@@ -4437,38 +3188,6 @@ void esc()
 #endif
 }
 
-//
-// =======================================================================================================
-// BATTERY MONITORING
-// =======================================================================================================
-//
-
-float batteryVolts()
-{
-  static float raw[6];
-  static bool initDone = false;
-#define VOLTAGE_CALIBRATION (RESISTOR_TO_BATTTERY_PLUS + RESISTOR_TO_GND) / RESISTOR_TO_GND + DIODE_DROP
-
-  if (!initDone)
-  { // Init array, if first measurement (important for call in setup)!
-    for (uint8_t i = 0; i <= 5; i++)
-    {
-      raw[i] = battery.readVoltage();
-    }
-    initDone = true;
-  }
-
-  raw[5] = raw[4]; // Move array content, then add latest measurement (averaging)
-  raw[4] = raw[3];
-  raw[3] = raw[2];
-  raw[2] = raw[1];
-  raw[1] = raw[0];
-
-  raw[0] = battery.readVoltage(); // read analog input
-
-  float voltage = (raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[5]) / 6 * VOLTAGE_CALIBRATION;
-  return voltage;
-}
 
 //
 // =======================================================================================================
@@ -4515,6 +3234,13 @@ void triggerHorn()
       hornTrigger = false;
     }
 
+     //ODiyGuyBrasil
+     if (GamePad.isSelectPressed()){
+       hornTrigger = true;
+       hornLatch = true;
+    }
+    // Fim OdiyGuyBrasil
+    
 #if not defined EXCAVATOR_MODE
 #ifndef NO_SIREN
     // detect siren trigger ( impulse length < 1100us) ----------
@@ -4884,17 +3610,6 @@ void trailerPresenceSwitchRead()
 #endif
 }
 
-//
-// =======================================================================================================
-// LCD DASHBOARD BY Gamadril: https://github.com/Gamadril/Rc_Engine_Sound_ESP32
-// =======================================================================================================
-//
-
-/* Bugs TODO:
-
-    Speed needle jump if shifting real 3 speed transmission. Better calibration needed
-*/
-
 bool engineStartAnimation()
 {
   static bool dirUp = true;
@@ -4907,10 +3622,10 @@ bool engineStartAnimation()
 
   if (millis() - lastFrameTime > 14)
   {
-    dashboard.setSpeed(speed);
-    dashboard.setRPM(rpm);
-    dashboard.setFuelLevel(fuel);
-    dashboard.setAdBlueLevel(adblue);
+    //dashboard.setSpeed(speed);
+    //dashboard.setRPM(rpm);
+    //dashboard.setFuelLevel(fuel);
+    //dashboard.setAdBlueLevel(adblue);
 
     speed += (dirUp ? 1 : -1) * (SPEED_MAX - SPEED_MIN) / 50;
     rpm += (dirUp ? 1 : -1) * (RPM_MAX - RPM_MIN) / 50;
@@ -4943,6 +3658,7 @@ bool engineStartAnimation()
   return false;
 }
 
+
 // ----------------------------------------------------------------------
 void updateDashboard()
 {
@@ -4973,18 +3689,6 @@ void updateDashboard()
   if (engineState == STARTING || engineState == RUNNING)
   {
     rpm = currentRpm * 450 / 500 + 50; // Idle rpm offset!
-
-#if defined BATTERY_PROTECTION
-    fuel = map_Generic<float, float, float, int16_t, int16_t>((batteryVoltage / numberOfCells), CUTOFF_VOLTAGE, FULLY_CHARGED_VOLTAGE, 0, 100);
-    if (fuel > 100)
-      fuel = 100;
-    if (fuel < 0)
-      fuel = 0;
-    if ((batteryVoltage / numberOfCells) < CUTOFF_VOLTAGE)
-      fuel = 0;
-#else
-    fuel = 90;
-#endif
     adblue = 80;
   }
   else
@@ -5007,45 +3711,7 @@ void updateDashboard()
 #endif
 
   speed = map(speed, 0, RPM_MAX, 0, MAX_REAL_SPEED);
-
-  if (!gearUpShiftingInProgress && !gearDownShiftingInProgress)
-  { // avoid jumps between gear switches
-    dashboard.setSpeed(speed);
-  }
-
-  // Central display
-#if defined BATTERY_PROTECTION
-  dashboard.setVolt(batteryVoltage, CUTOFF_VOLTAGE * numberOfCells);
-#endif
-
-  if (neutralGear)
-  {
-    dashboard.setGear(0);
-  }
-  else if (escInReverse)
-  {
-    dashboard.setGear(-1);
-  }
-  else
-  {
-    if (!automatic)
-      dashboard.setGear(selectedGear); // Manual transmission
-    else
-      dashboard.setGear(selectedAutomaticGear); // Automatic transmission
-  }
-
   // Indicator lamps
-#ifdef HAZARDS_WHILE_5TH_WHEEL_UNLOCKED
-  dashboard.setLeftIndicator(indicatorSoundOn && (indicatorLon || hazard || unlock5thWheel || batteryProtection));
-  dashboard.setRightIndicator(indicatorSoundOn && (indicatorRon || hazard || unlock5thWheel || batteryProtection));
-#else
-  dashboard.setLeftIndicator(indicatorSoundOn && (indicatorLon || hazard || batteryProtection));
-  dashboard.setRightIndicator(indicatorSoundOn && (indicatorRon || hazard || batteryProtection));
-#endif
-  dashboard.setLowBeamIndicator(lightsOn);
-  dashboard.setHighBeamIndicator(headLightsHighBeamOn || headLightsFlasherOn);
-  dashboard.setFogLightIndicator(fogLightOn);
-
   // Needles
   if (millis() - lastFrameTime > 14)
   {
@@ -5072,256 +3738,12 @@ void updateDashboard()
     if (adblue < adblueNeedle)
       adblueNeedle--;
 
-    dashboard.setRPM(rpmNeedle);
-    dashboard.setFuelLevel(fuelNeedle);
-    dashboard.setAdBlueLevel(adblueNeedle);
+    //dashboard.setRPM(rpmNeedle);
+   // dashboard.setFuelLevel(fuelNeedle);
+    //dashboard.setAdBlueLevel(adblueNeedle);
     lastFrameTime = millis();
   }
 }
-
-//
-// =======================================================================================================
-// NEOPIXEL WS2812 LED
-// =======================================================================================================
-//
-
-void updateRGBLEDs()
-{
-#if defined NEOPIXEL_ENABLED
-
-  static uint32_t lastNeopixelTime = millis();
-  static bool knightRiderLatch = false;
-  static bool unionJackLatch = false;
-  static bool neopixelShow = false;
-
-#ifdef NEOPIXEL_DEMO // Demo -------------------------------------------------------------
-  if (millis() - lastNeopixelTime > 20)
-  { // Every 20 ms
-    lastNeopixelTime = millis();
-
-    uint8_t hue = map(pulseWidth[1], 1000, 2000, 0, 255);
-
-    rgbLEDs[0] = CHSV(hue, hue < 255 ? 255 : 0, hue > 0 ? 255 : 0);
-    rgbLEDs[1] = CRGB::Red;
-    rgbLEDs[2] = CRGB::White;
-    rgbLEDs[3] = CRGB::Yellow;
-    rgbLEDs[4] = CRGB::Blue;
-    rgbLEDs[5] = CRGB::Green;
-    neopixelShow = true;
-  }
-#endif
-
-#ifdef NEOPIXEL_KNIGHT_RIDER // Knight Rider scanner -------------------------------------
-  static int16_t increment = 1;
-  static int16_t counter = 0;
-
-  if (millis() - lastNeopixelTime > 91)
-  { // Every 91 ms (must match with sound)
-    lastNeopixelTime = millis();
-
-    if (sirenTrigger || knightRiderLatch)
-    { // Only active, if siren signal!
-      if (counter >= NEOPIXEL_COUNT - 1)
-        increment = -1;
-      if (counter <= 0)
-        increment = 1;
-      knightRiderLatch = (counter > 0);
-      rgbLEDs[counter] = CRGB::Red;
-      counter += increment;
-    }
-    else
-    {
-      counter = 0;
-    }
-    for (int i = 0; i < NEOPIXEL_COUNT; i++)
-    {
-      rgbLEDs[i].nscale8(160); // 160
-    }
-    neopixelShow = true;
-  }
-#endif
-
-#ifdef NEOPIXEL_BLUELIGHT // Bluelight ----------------------------------------------------
-  static uint32_t lastNeopixelBluelightTime = millis();
-
-  if (millis() - lastNeopixelTime > 20)
-  { // Every 20 ms
-    lastNeopixelTime = millis();
-    if (blueLightTrigger)
-    {
-      if (millis() - lastNeopixelBluelightTime > 0)
-      { // Step 1
-        rgbLEDs[0] = CRGB::Red;
-        rgbLEDs[1] = CRGB::Blue;
-        rgbLEDs[3] = CRGB::Red;
-        rgbLEDs[4] = CRGB::Blue;
-        rgbLEDs[6] = CRGB::Red;
-        rgbLEDs[7] = CRGB::Blue;
-      }
-      if (millis() - lastNeopixelBluelightTime > 160)
-      { // Step 2
-        fill_solid(rgbLEDs, NEOPIXEL_COUNT, CRGB::Black);
-      }
-      if (millis() - lastNeopixelBluelightTime > 300)
-      { // Step 3
-        rgbLEDs[0] = CRGB::Blue;
-        rgbLEDs[1] = CRGB::Red;
-        rgbLEDs[3] = CRGB::Blue;
-        rgbLEDs[4] = CRGB::Red;
-        rgbLEDs[6] = CRGB::Blue;
-        rgbLEDs[7] = CRGB::Red;
-      }
-      if (millis() - lastNeopixelBluelightTime > 460)
-      { // Step 4
-        fill_solid(rgbLEDs, NEOPIXEL_COUNT, CRGB::Black);
-      }
-      if (millis() - lastNeopixelBluelightTime > 600)
-      { // Step 5
-        lastNeopixelBluelightTime = millis();
-      }
-    }
-    else
-      fill_solid(rgbLEDs, NEOPIXEL_COUNT, CRGB::Black); // Off
-    neopixelShow = true;
-  }
-#endif
-
-#ifdef NEOPIXEL_UNION_JACK // United Kingdom animation ---------------------------------------
-  static uint32_t lastNeopixelUnionJackTime = millis();
-  static uint8_t animationStep = 1;
-
-  if (sirenTrigger || unionJackLatch)
-  {
-    unionJackLatch = true;
-    if (millis() - lastNeopixelUnionJackTime > 789)
-    { // Every 789 ms (must match with sound "BritishNationalAnthemSiren.h")
-      lastNeopixelUnionJackTime = millis();
-      if (animationStep == 1 || animationStep == 9)
-      { // Step 1 or 9
-        rgbLEDs[0] = CRGB::Red;
-        rgbLEDs[1] = CRGB::Blue;
-        rgbLEDs[2] = CRGB::Blue;
-        rgbLEDs[3] = CRGB::Red;
-        rgbLEDs[4] = CRGB::Red;
-        rgbLEDs[5] = CRGB::Blue;
-        rgbLEDs[6] = CRGB::Blue;
-        rgbLEDs[7] = CRGB::Red;
-      }
-      if (animationStep == 2 || animationStep == 8)
-      { // Step 2 or 8
-        rgbLEDs[0] = CRGB::White;
-        rgbLEDs[1] = CRGB::Red;
-        rgbLEDs[2] = CRGB::Blue;
-        rgbLEDs[3] = CRGB::Red;
-        rgbLEDs[4] = CRGB::Red;
-        rgbLEDs[5] = CRGB::Blue;
-        rgbLEDs[6] = CRGB::Red;
-        rgbLEDs[7] = CRGB::White;
-      }
-      if (animationStep == 3 || animationStep == 7)
-      { // Step 3 or 7
-        rgbLEDs[0] = CRGB::Blue;
-        rgbLEDs[1] = CRGB::White;
-        rgbLEDs[2] = CRGB::Red;
-        rgbLEDs[3] = CRGB::Red;
-        rgbLEDs[4] = CRGB::Red;
-        rgbLEDs[5] = CRGB::Red;
-        rgbLEDs[6] = CRGB::White;
-        rgbLEDs[7] = CRGB::Blue;
-      }
-      if (animationStep == 4 || animationStep == 5 || animationStep == 6)
-      { // Step 4
-        rgbLEDs[0] = CRGB::Red;
-        rgbLEDs[1] = CRGB::Red;
-        rgbLEDs[2] = CRGB::Red;
-        rgbLEDs[3] = CRGB::Red;
-        rgbLEDs[4] = CRGB::Red;
-        rgbLEDs[5] = CRGB::Red;
-        rgbLEDs[6] = CRGB::Red;
-        rgbLEDs[7] = CRGB::Red;
-      }
-      if (animationStep == 10)
-      { // Step 10
-        fill_solid(rgbLEDs, NEOPIXEL_COUNT, CRGB::Black);
-        animationStep = 0;
-        unionJackLatch = false;
-      }
-      animationStep++;
-      neopixelShow = true;
-    }
-  }
-  else
-  {
-    animationStep = 1;
-    lastNeopixelUnionJackTime = millis();
-  }
-#endif
-
-#ifdef NEOPIXEL_HIGHBEAM // Neopixel bar is used as high beam as well --------------------
-  static uint32_t lastNeopixelHighbeamTime = millis();
-  if (millis() - lastNeopixelHighbeamTime > 20)
-  { // Every 20 ms
-    lastNeopixelHighbeamTime = millis();
-
-    if (!knightRiderLatch && !sirenTrigger && !blueLightTrigger && !unionJackLatch)
-    {
-      if (headLightsHighBeamOn || headLightsFlasherOn)
-        fill_solid(rgbLEDs, NEOPIXEL_COUNT, CRGB::White);
-      else
-        fill_solid(rgbLEDs, NEOPIXEL_COUNT, CRGB::Black);
-    }
-    neopixelShow = true;
-  }
-#endif
-
-#ifdef NEOPIXEL_B33LZ3BUB // B33lz3bub Austria cab light ---------------------------------
-  if (millis() - lastNeopixelTime > 20)
-  { // Every 20 ms
-    lastNeopixelTime = millis();
-
-    uint8_t hue = map(pulseWidth[7], 1000, 2000, 0, 255); // map pulseWidth[7] from poti VRA to hue
-    if (hue <= 20)
-    { // LEDs off
-      fill_solid(rgbLEDs, NEOPIXEL_COUNT, CRGB::Black);
-    }
-    else if (hue > 20 && hue < 235)
-    { // different colors depending on potentiometer VRA CH7
-      for (int i = 0; i < NEOPIXEL_COUNT; i++)
-      {
-        rgbLEDs[i] = CHSV(hue, hue < 255 ? 255 : 0, hue > 0 ? 255 : 0);
-      }
-    }
-    else if (hue >= 235 && hue < 250)
-    { // colors red-white-red -> flag color of Austria ;-)
-      rgbLEDs[0] = CRGB::Red;
-      rgbLEDs[1] = CRGB::White;
-      rgbLEDs[2] = CRGB::Red;
-    }
-    else
-    {
-      fill_solid(rgbLEDs, NEOPIXEL_COUNT, CRGB::White); // only white
-    }
-    neopixelShow = true;
-  }
-#endif
-
-  // Neopixel refresh for all options above ------------------------------------------------
-  static uint32_t lastNeopixelRefreshTime = millis();
-  if (millis() - lastNeopixelRefreshTime > 20 && neopixelShow)
-  { // Every 20 ms
-    lastNeopixelRefreshTime = millis();
-    FastLED.show();
-    neopixelShow = false;
-  }
-#endif
-}
-
-//
-// =======================================================================================================
-// EXCAVATOR CONTROL
-// =======================================================================================================
-//
-
 void excavatorControl()
 {
 
@@ -5440,13 +3862,6 @@ void excavatorControl()
     }
   }
 }
-
-//
-// =======================================================================================================
-// STEAM LOCOMOTIVE CONTROL
-// =======================================================================================================
-//
-
 void steamLocomotiveControl()
 {
 #if defined STEAM_LOCOMOTIVE_MODE
@@ -5464,105 +3879,6 @@ void steamLocomotiveControl()
 #endif
 }
 
-//
-// =======================================================================================================
-// TRAILER CONTROL (ESP NOW)
-// =======================================================================================================
-//
-
-void trailerControl()
-{
-#if defined ENABLE_WIRELESS
-
-  static unsigned long espNowMillis;
-
-  uint8_t taillightOld = 0;
-  uint8_t sidelightOld = 0;
-  uint8_t reversingLightOld = 0;
-  uint8_t indicatorLOld = 0;
-  uint8_t indicatorROld = 0;
-  bool legsUpOld = false;
-  bool legsdownOld = false;
-  bool rampsUpOld = false;
-  bool rampsdownOld = false;
-  bool beaconsOnOld = false;
-
-  if (millis() - espNowMillis > pollRate)
-  { // Every 20ms
-    espNowMillis = millis();
-
-    // Store previous values for comparison
-    taillightOld = trailerData.tailLight;
-    sidelightOld = trailerData.sideLight;
-    reversingLightOld = trailerData.reversingLight;
-    indicatorLOld = trailerData.indicatorL;
-    indicatorROld = trailerData.indicatorR;
-    legsUpOld = trailerData.legsUp;
-    legsdownOld = trailerData.legsDown;
-    rampsUpOld = trailerData.rampsUp;
-    rampsdownOld = trailerData.rampsDown;
-    beaconsOnOld = trailerData.beaconsOn;
-
-    // Set values to send
-    // Lights (timer number in brackets, not pin number, see LED setup section)
-#ifdef TRAILER_LIGHTS_TRAILER_PRESENCE_SWITCH_DEPENDENT // Tralier lights depending on truck mounted switch
-    if (trailerDetected)
-    {
-      trailerData.tailLight = ledcRead(2);
-      trailerData.sideLight = ledcRead(8);
-      trailerData.reversingLight = ledcRead(6);
-      trailerData.indicatorL = ledcRead(3);
-      trailerData.indicatorR = ledcRead(4);
-    }
-    else
-    {
-      trailerData.tailLight = 0;
-      trailerData.sideLight = 0;
-      trailerData.reversingLight = 0;
-      trailerData.indicatorL = 0;
-      trailerData.indicatorR = 0;
-    }
-#else // Trailer lights always on
-    trailerData.tailLight = ledcRead(2); // These are timer numbers, not pin numbers!
-    trailerData.sideLight = ledcRead(8);
-    trailerData.reversingLight = ledcRead(6);
-    trailerData.indicatorL = ledcRead(3);
-    trailerData.indicatorR = ledcRead(4);
-#endif
-    // Other signals
-    trailerData.legsUp = legsUp;
-    trailerData.legsDown = legsDown;
-    trailerData.rampsUp = rampsUp;
-    trailerData.rampsDown = rampsDown;
-    trailerData.beaconsOn = blueLightTrigger;
-
-    // Check, if one or more values have changed (saves battery live, prevents speaker noise and the ESP32 runs cooler)
-    if (taillightOld != trailerData.tailLight ||
-        sidelightOld != trailerData.sideLight ||
-        reversingLightOld != trailerData.reversingLight ||
-        indicatorLOld != trailerData.indicatorL ||
-        indicatorROld != trailerData.indicatorR ||
-        legsUpOld != trailerData.legsUp ||
-        legsdownOld != trailerData.legsDown ||
-        rampsUpOld != trailerData.rampsUp ||
-        rampsdownOld != trailerData.rampsDown ||
-        beaconsOnOld != trailerData.beaconsOn)
-    {
-
-      // If so, then send message via ESP-NOW
-      esp_err_t result = esp_now_send(0, (uint8_t *)&trailerData, sizeof(trailerData));
-
-#ifdef ESPNOW_DEBUG
-
-      // This will confirm if a message was SENT successfully (callback will later check if RECEIVED and by whom).
-      Serial.printf("ESP-NOW data sent: %s\n", result == ESP_NOW_SEND_SUCCESS ? "OK" : "FAILED");
-#endif
-    }
-  }
-#endif
-}
-
-//
 // =======================================================================================================
 // MAIN LOOP, RUNNING ON CORE 1
 // =======================================================================================================
@@ -5570,56 +3886,29 @@ void trailerControl()
 
 void loop()
 {
+//ODiyGuyBrasil  
+    oDiyGuyDabbleBt();
+   
 
-#if defined SBUS_COMMUNICATION
-  readSbusCommands(); // SBUS communication (pin 36)
-  mcpwmOutput();      // PWM servo signal output
-
-#elif defined IBUS_COMMUNICATION
-  readIbusCommands(); // IBUS communication (pin 36)
-  mcpwmOutput();      // PWM servo signal output
-
-#elif defined SUMD_COMMUNICATION
-  readSumdCommands(); // SUMD communication (pin 36)
-  mcpwmOutput();      // PWM servo signal output
-
-#elif defined PPM_COMMUNICATION
-  readPpmCommands(); // PPM communication (pin 36)
-  mcpwmOutput();     // PWM servo signal output
-
-#else
-  // measure RC signals mark space ratio
-  readPwmSignals();
+#if defined DABBLE_COMMUNICATION
+  readDabbleCommands(); 
+  mcpwmOutput();      
 #endif
 
   // Horn triggering
   triggerHorn();
-
+  
   // Indicator (turn signal) triggering
   triggerIndicators();
 
   if (xSemaphoreTake(xRpmSemaphore, portMAX_DELAY))
   {
     // Map pulsewidth to throttle
-    mapThrottle();
+     mapThrottle();
 
     // rcTrigger
     rcTriggerRead();
 
-    // Excavator specific controls
-#if defined EXCAVATOR_MODE
-    excavatorControl();
-#endif
-
-    // Steam locomotive specific controls
-#if defined STEAM_LOCOMOTIVE_MODE
-    steamLocomotiveControl();
-#endif
-
-    // Dashboard control
-#if defined SPI_DASHBOARD
-    updateDashboard();
-#endif
     xSemaphoreGive(xRpmSemaphore); // Now free or "Give" the semaphore for others.
   }
 
@@ -5627,76 +3916,44 @@ void loop()
 #if not defined THIRD_BRAKELIGHT and not defined RZ7886_DRIVER_MODE
   trailerPresenceSwitchRead();
 #endif
-
-  // RGB LED control
-#if defined NEOPIXEL_ENABLED
-  updateRGBLEDs();
-#endif
-
-  // Trailer control, using ESP NOW
-  trailerControl();
-
-  // Configuration website
-  webInterface();
-
   // Core ID debug
 #if defined CORE_DEBUG
   Serial.print("Running on core ");
   Serial.println(coreId);
 #endif
-
   // Feeding the RTC watchtog timer is essential!
   rtc_wdt_feed();
 }
-
-//
-// =======================================================================================================
-// 1st MAIN TASK, RUNNING ON CORE 0 (Interrupts are running on this core as well)
-// =======================================================================================================
-//
 
 void Task1code(void *pvParameters)
 {
   for (;;)
   {
-
-    // coreId = xPortGetCoreID(); // Running on core 0
-
-    // DAC offset fader
     dacOffsetFade();
-
     if (xSemaphoreTake(xRpmSemaphore, portMAX_DELAY))
     {
       // Simulate engine mass, generate RPM signal
       engineMassSimulation();
-
       // Call gear selector
       if (automatic || doubleClutch)
         automaticGearSelector();
       xSemaphoreGive(xRpmSemaphore); // Now free or "Give" the semaphore for others.
     }
-
     // Switch engine on or off
     engineOnOff();
-
     // LED control
     if (autoZeroDone)
       led();
-
 #if not defined SPI_DASHBOARD
     // Shaker control
     shaker();
 #endif
-
     // Gearbox detection
     gearboxDetection();
-
     // ESC control & low discharge protection
     esc();
-
     // measure loop time
     loopTime = loopDuration(); // for debug only
-
     // Feeding the RTC watchtog timer is essential!
     rtc_wdt_feed(); // TODO, test only
   }

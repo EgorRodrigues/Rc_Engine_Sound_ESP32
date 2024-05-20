@@ -42,13 +42,13 @@ WIFI_POWER_7dBm = 28         // recommended setting
 WIFI_POWER_5dBm = 20
 WIFI_POWER_2dBm = 8          // lowest setting, WiFi may become weak
 */ 
-wifi_power_t cpType = WIFI_POWER_7dBm; // Only use values from above!
+// wifi_power_t cpType = WIFI_POWER_7dBm; // Only use values from above!
 
 // WiFi settings (for vehicle configuration website, open 192.168.4.1 in your browser)--------------------------------------------------------------
 // Note: if these credentials were changed, using the configuration website, 
 // you can find the current ones in the serial monitor!
-String default_ssid = "My_Truck"; // Select this network
-String default_password = "123456789"; // Then enter this password
+//String default_ssid = "My_Truck"; // Select this network
+//String default_password = "123456789"; // Then enter this password
 
 // Configuration website settings -------------------------------------------------------------------------------------------------------------------
 #define USE_CSS // Simple, unformatted Website style is used, if not defined
