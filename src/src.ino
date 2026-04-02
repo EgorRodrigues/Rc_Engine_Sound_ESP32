@@ -103,6 +103,7 @@ char codeVersion[] = "9.15.0-b5"; // Software revision.
 #include <esp_wifi.h>
 #include <Esp.h>    // for displaying memory information
 #include <EEPROM.h> // for non volatile variable storage
+#include <BluetoothSerial.h> // for Bluetooth communication
 
 // Forward declare functions
 void Task1code(void *parameters);
@@ -111,6 +112,7 @@ void readIbusCommands();
 void readSumdCommands();
 void readPpmCommands();
 void readPwmSignals();
+void readBluetoothCommands();
 void processRawChannels();
 void failsafeRcSignals();
 void channelZero();
@@ -275,6 +277,9 @@ ESP32AnalogRead battery;
 // Webserver on port 80
 WiFiServer server(80);
 
+// Bluetooth serial
+BluetoothSerial SerialBT;
+
 // Global variables **********************************************************************
 
 // WiFi variables
@@ -327,7 +332,9 @@ bfs::SbusRx sBus(&Serial2);
 std::array<int16_t, bfs::SbusRx::NUM_CH()> SBUSchannels;
 #endif // -----------------------------------------------
 bool sbusInit;
+bool bluetoothInit;
 uint32_t maxSbusRpmPercentage = 390; // Limit required to prevent controller from crashing @ high engine RPM
+uint32_t maxBluetoothRpmPercentage = 390; // Same as SBUS for now
 
 // SUMD signal processing variables
 HardwareSerial serial(2);
@@ -2077,6 +2084,12 @@ void setup()
   sumd.begin(COMMAND_RX);                      // begin SUMD communication with compatible receivers
   setupMcpwm();                                // mcpwm servo output setup
 
+#elif defined BLUETOOTH_COMMUNICATION // Bluetooth ----
+  if (MAX_RPM_PERCENTAGE > maxBluetoothRpmPercentage)
+    MAX_RPM_PERCENTAGE = maxBluetoothRpmPercentage; // Limit RPM range
+  SerialBT.begin("RC_Controller");                  // begin Bluetooth serial communication
+  setupMcpwm();                                     // mcpwm servo output setup
+
 #else
   // PWM ----
 #define PWM_COMMUNICATION
@@ -2223,6 +2236,21 @@ void setup()
     rtc_wdt_feed(); // Feed watchdog timer
   }
   Serial.printf("... SUMD initialization succesful!\n");
+
+#elif defined BLUETOOTH_COMMUNICATION
+  bluetoothInit = false;
+  Serial.printf("Initializing Bluetooth ...\n");
+  Serial.printf("(Make sure Bluetooth device is paired and sending data in the correct format.)\n");
+  while (!bluetoothInit)
+  {
+    readBluetoothCommands();           // Bluetooth communication
+    indicatorL.flash(70, 75, 500, 3); // Show 3 fast flashes on indicators!
+    indicatorR.flash(70, 75, 500, 3);
+    serialInterface();
+    webInterface();
+    rtc_wdt_feed(); // Feed watchdog timer
+  }
+  Serial.printf("... Bluetooth initialization succesful!\n");
 
 #elif defined PPM_COMMUNICATION
   readPpmCommands();
@@ -2438,6 +2466,70 @@ void readSbusCommands()
   }
 
   if (sbusInit)
+  {
+    // Normalize, auto zero and reverse channels
+    processRawChannels();
+
+    // Failsafe for RC signals
+    failsafeRcSignals();
+  }
+}
+
+//
+// =======================================================================================================
+// READ BLUETOOTH SIGNALS
+// =======================================================================================================
+//
+
+void readBluetoothCommands()
+{
+  // Signals are coming in via Bluetooth serial protocol
+  // Expected format: "1500,1500,1000,...\n" for 16 channels (comma-separated pulse widths in microseconds)
+
+  static unsigned long lastBluetoothRead;
+  static uint16_t bluetoothReadCycles;
+
+  if (millis() - lastBluetoothRead > 20) // Read every 20ms
+  {
+    lastBluetoothRead = millis();
+
+    if (SerialBT.available())
+    {
+      String data = SerialBT.readStringUntil('\n');
+      data.trim();
+
+      // Parse comma-separated values
+      int index = 0;
+      char *token = strtok((char *)data.c_str(), ",");
+      while (token != NULL && index < 16)
+      {
+        int value = atoi(token);
+        if (value >= 1000 && value <= 2000)
+        {
+          pulseWidthRaw[index + 1] = value;
+        }
+        token = strtok(NULL, ",");
+        index++;
+      }
+
+      if (index >= 6) // At least 6 channels received
+      {
+        bluetoothInit = true;
+        bluetoothReadCycles = 0;
+        failSafe = false;
+      }
+    }
+    else
+    {
+      bluetoothReadCycles++;
+      if (bluetoothReadCycles > 50) // About 1 second without data
+      {
+        failSafe = true;
+      }
+    }
+  }
+
+  if (bluetoothInit)
   {
     // Normalize, auto zero and reverse channels
     processRawChannels();
@@ -6559,6 +6651,10 @@ void loop()
 #elif defined SUMD_COMMUNICATION
   readSumdCommands(); // SUMD communication (pin 36)
   mcpwmOutput();      // PWM servo signal output
+
+#elif defined BLUETOOTH_COMMUNICATION
+  readBluetoothCommands(); // Bluetooth communication
+  mcpwmOutput();           // PWM servo signal output
 
 #elif defined PPM_COMMUNICATION
   readPpmCommands(); // PPM communication (pin 36)

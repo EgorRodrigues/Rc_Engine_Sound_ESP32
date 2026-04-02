@@ -16,6 +16,8 @@
 // #define MICRO_RC                // <------- The car style DIY "Micro RC" remote. Don't use this with standard remotes!
 // #define MICRO_RC_STICK          // <------- The stick based DIY "Micro RC" remote. Don't use this with standard remotes!
 
+#define BLUETOOTH_CONTROLLER     // <------- Bluetooth controller (use BLUETOOTH communication setting)
+
 // For testing only!
 // #define FLYSKY_FS_I6S_EXCAVATOR_TEST // <------- Flysky FS-i6s for KABOLITE K336 hydraulic excavator
 
@@ -44,6 +46,9 @@ uint16_t sbusFailsafeTimeout = 100; // Failsafe is triggered after this timeout 
 
 // PPM communication (RX header, 8 channels, working fine, but channel signals are a bit jittery) --------
 // #define PPM_COMMUNICATION // control signals are coming in via the PPM interface (comment it out for classic PWM RC signals)
+
+// BLUETOOTH communication (Bluetooth serial, custom protocol) --------
+#define BLUETOOTH_COMMUNICATION // control signals are coming in via Bluetooth serial
 
 // CHANNEL LINEARITY SETTINGS  ****************************************************************************************************************
 // Note: avoid these options for excavators!
@@ -1325,5 +1330,80 @@ const uint16_t pulseSpan = 480;
 
 // SBUS mode ----
 boolean sbusInverted = false; // false = non standard (inverted) SBUS signal
+
+#endif
+
+// Bluetooth controller configuration profile -----------------------------------------------------------------------------------
+#ifdef BLUETOOTH_CONTROLLER
+
+// Channel assignment (use NONE for non existing channels!)
+// Remote channel #######   // Sound controller channel ##########################################
+#define STEERING 1           // CH1 steering
+#define GEARBOX 2            // CH2 3 position switch for gearbox (left throttle in tracked mode)
+#define THROTTLE 3           // CH3 throttle & brake (right throttle in tracked mode)
+#define HORN 4               // CH4 horn and bluelight / siren
+#define FUNCTION_R 5         // CH5 jake brake, high / low beam, headlight flasher, engine on / off
+#define FUNCTION_L 6         // CH6 indicators, hazards
+#define POT2 7               // CH7 pot 2
+#define MODE1 8              // CH8 mode 1 switch
+#define MODE2 9              // CH9 mode 2 switch
+#define MOMENTARY1 10        // CH10
+#define HAZARDS 11           // CH11
+#define INDICATOR_LEFT 12    // CH12
+#define INDICATOR_RIGHT 13   // CH13
+#define CH_14 14             // CH14
+#define CH_15 15             // CH15
+#define CH_16 16             // CH16
+
+// Channels reversed or not
+boolean channelReversed[17] = {
+    false, // CH0 (unused)
+    false, // CH1
+    false, // CH2
+    false, // CH3
+    false, // CH4
+    false, // CH5
+    false, // CH6
+    false, // CH7
+    false, // CH8
+    false, // CH9
+    false, // CH10
+    false, // CH11
+    false, // CH12
+    false, // CH13
+    false, // CH14
+    false, // CH15
+    false  // CH16
+};
+
+// Channels auto zero adjustment or not (don't use it for channels without spring centered neutral position, switches or unused channels)
+boolean channelAutoZero[17] = {
+    false, // CH0 (unused)
+    true,  // CH1
+    false, // CH2
+    true,  // CH3
+    false, // CH4
+    false, // CH5
+    false, // CH6
+    false, // CH7
+    false, // CH8
+    false, // CH9
+    false, // CH10
+    false, // CH11
+    false, // CH12
+    false, // CH13
+    false, // CH14
+    false, // CH15
+    false  // CH16
+};
+
+// Channels signal range calibration -----
+const uint16_t pulseNeutral = 30;
+const uint16_t pulseSpan = 480;
+
+// Automatic or manual modes -----
+// #define AUTO_LIGHTS
+// #define AUTO_ENGINE_ON_OFF
+// #define AUTO_INDICATORS
 
 #endif
