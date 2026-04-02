@@ -1,4 +1,4 @@
-/* RC engine sound & light controller for Arduino ESP32. Written by TheDIYGuy999
+/*RC engine sound & light controller for Arduino ESP32. Written by TheDIYGuy999
     Based on the code for ATmega 328: https://github.com/TheDIYGuy999/Rc_Engine_Sound
 
     ***** ESP32 CPU frequency must be set to 240MHz! *****
@@ -315,9 +315,6 @@ ESP32AnalogRead battery;
 
 // Webserver on port 80
 WiFiServer server(80);
-
-// Bluetooth serial
-BluetoothSerial SerialBT;
 
 // Global variables **********************************************************************
 
