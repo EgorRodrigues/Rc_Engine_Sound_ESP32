@@ -316,6 +316,9 @@ ESP32AnalogRead battery;
 // Webserver on port 80
 WiFiServer server(80);
 
+// Bluetooth serial
+BluetoothSerial SerialBT;
+
 // Global variables **********************************************************************
 
 // WiFi variables
