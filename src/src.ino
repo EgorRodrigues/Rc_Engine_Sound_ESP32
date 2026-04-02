@@ -102,7 +102,10 @@ char codeVersion[] = "9.15.0-b2"; // Software revision.
 #include <esp_wifi.h>
 #include <Esp.h>    // for displaying memory information
 #include <EEPROM.h> // for non volatile variable storage
-#include <BluetoothSerial.h> // for Bluetooth communication
+#include <Bluepad32.h> // for Bluetooth gamepad support
+
+// Bluetooth gamepad
+ControllerPtr myControllers[BP32_MAX_GAMEPADS];
 
 // Forward declare functions
 void Task1code(void *parameters);
@@ -113,6 +116,8 @@ void readPpmCommands();
 void readPwmSignals();
 void readBluetoothCommands();
 void processRawChannels();
+void processControllers();
+void processGamepad(ControllerPtr ctl);
 void failsafeRcSignals();
 void channelZero();
 float batteryVolts();
@@ -121,6 +126,40 @@ void eepromRead();
 void eepromInit();
 void serialInterface();
 void webInterface();
+
+// Bluepad32 callbacks
+void onConnectedController(ControllerPtr ctl) {
+    bool foundEmptySlot = false;
+    for (int i = 0; i < BP32_MAX_GAMEPADS; i++) {
+        if (myControllers[i] == nullptr) {
+            Serial.printf("CALLBACK: Controller is connected, index=%d\n", i);
+            ControllerProperties properties = ctl->getProperties();
+            Serial.printf("Controller model: %s, VID=0x%04x, PID=0x%04x\n", ctl->getModelName().c_str(), properties.vendor_id,
+                           properties.product_id);
+            myControllers[i] = ctl;
+            foundEmptySlot = true;
+            break;
+        }
+    }
+    if (!foundEmptySlot) {
+        Serial.println("CALLBACK: Controller connected, but could not found empty slot");
+    }
+}
+
+void onDisconnectedController(ControllerPtr ctl) {
+    bool foundController = false;
+    for (int i = 0; i < BP32_MAX_GAMEPADS; i++) {
+        if (myControllers[i] == ctl) {
+            Serial.printf("CALLBACK: Controller disconnected from index=%d\n", i);
+            myControllers[i] = nullptr;
+            foundController = true;
+            break;
+        }
+    }
+    if (!foundController) {
+        Serial.println("CALLBACK: Controller disconnected, but not found in myControllers");
+    }
+}
 
 // The following tasks are only required for Arduino IDE! ----
 // Install ESP32 board according to: https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/
@@ -275,9 +314,6 @@ ESP32AnalogRead battery;
 
 // Webserver on port 80
 WiFiServer server(80);
-
-// Bluetooth serial
-BluetoothSerial SerialBT;
 
 // Global variables **********************************************************************
 
@@ -2033,7 +2069,10 @@ void setup()
 #elif defined BLUETOOTH_COMMUNICATION // Bluetooth ----
   if (MAX_RPM_PERCENTAGE > maxBluetoothRpmPercentage)
     MAX_RPM_PERCENTAGE = maxBluetoothRpmPercentage; // Limit RPM range
-  SerialBT.begin("RC_Controller");                  // begin Bluetooth serial communication
+  // Setup the Bluepad32 callbacks
+  BP32.setup(&onConnectedController, &onDisconnectedController);
+  BP32.forgetBluetoothKeys(); // Optional: forget keys to allow new pairings
+  BP32.enableVirtualDevice(false);
   setupMcpwm();                                     // mcpwm servo output setup
 
 #else
@@ -2162,17 +2201,27 @@ void setup()
 #elif defined BLUETOOTH_COMMUNICATION
   bluetoothInit = false;
   Serial.printf("Initializing Bluetooth ...\n");
-  Serial.printf("(Make sure Bluetooth device is paired and sending data in the correct format.)\n");
-  while (!bluetoothInit)
+  Serial.printf("(Make sure PS4 controller is paired via Bluepad32.)\n");
+  // Bluepad32 is already set up, wait for controller connection
+  unsigned long startTime = millis();
+  while (!bluetoothInit && millis() - startTime < 10000) // Wait up to 10 seconds
   {
-    readBluetoothCommands();           // Bluetooth communication
+    BP32.update();
+    processControllers();
+    if (myControllers[0] && myControllers[0]->isConnected()) {
+      bluetoothInit = true;
+    }
     indicatorL.flash(70, 75, 500, 3); // Show 3 fast flashes on indicators!
     indicatorR.flash(70, 75, 500, 3);
     serialInterface();
     webInterface();
     rtc_wdt_feed(); // Feed watchdog timer
   }
-  Serial.printf("... Bluetooth initialization succesful!\n");
+  if (bluetoothInit) {
+    Serial.printf("... Bluetooth initialization succesful!\n");
+  } else {
+    Serial.printf("... Bluetooth initialization failed, no controller connected.\n");
+  }
 
 #elif defined PPM_COMMUNICATION
   readPpmCommands();
@@ -2383,10 +2432,73 @@ void readSbusCommands()
 
 //
 // =======================================================================================================
-// READ BLUETOOTH SIGNALS
+// PROCESS BLUETOOTH CONTROLLERS
 // =======================================================================================================
 //
 
+void processControllers() {
+    for (auto myController : myControllers) {
+        if (myController && myController->isConnected() && myController->hasData()) {
+            if (myController->isGamepad()) {
+                processGamepad(myController);
+            } else {
+                Serial.println("Unsupported controller");
+            }
+        }
+    }
+}
+
+void processGamepad(ControllerPtr ctl) {
+    // Map PS4 controller to RC channels
+    // Left stick X: steering (CH1)
+    pulseWidthRaw[1] = map(ctl->axisX(), -511, 512, 1000, 2000);
+    // Left stick Y: throttle (CH3) - invert Y axis
+    pulseWidthRaw[3] = map(-ctl->axisY(), -511, 512, 1000, 2000);
+    // Right stick X: function_L (CH6)
+    pulseWidthRaw[6] = map(ctl->axisRX(), -511, 512, 1000, 2000);
+    // Right stick Y: function_R (CH5) - invert Y axis
+    pulseWidthRaw[5] = map(-ctl->axisRY(), -511, 512, 1000, 2000);
+
+    // Buttons
+    // Horn (CH4): Cross (A) button
+    pulseWidthRaw[4] = ctl->a() ? 2000 : 1000;
+    // Gearbox (CH2): D-pad up/down
+    if (ctl->dpad() & DPAD_UP) {
+        pulseWidthRaw[2] = 2000; // High gear
+    } else if (ctl->dpad() & DPAD_DOWN) {
+        pulseWidthRaw[2] = 1000; // Low gear
+    } else {
+        pulseWidthRaw[2] = 1500; // Neutral
+    }
+
+    // Mode1 (CH8): L1 button
+    pulseWidthRaw[8] = ctl->l1() ? 2000 : 1000;
+    // Mode2 (CH9): R1 button
+    pulseWidthRaw[9] = ctl->r1() ? 2000 : 1000;
+
+    // Set other channels to neutral if not used
+    for (int i = 7; i <= 16; i++) {
+        if (i != 1 && i != 2 && i != 3 && i != 4 && i != 5 && i != 6 && i != 8 && i != 9) {
+            pulseWidthRaw[i] = 1500;
+        }
+    }
+
+    // Set failsafe to false since we have data
+    failSafe = false;
+    bluetoothInit = true;
+
+    // Process channels
+    processRawChannels();
+    failsafeRcSignals();
+}
+
+//
+// =======================================================================================================
+// READ BLUETOOTH SIGNALS (deprecated, replaced by Bluepad32)
+// =======================================================================================================
+//
+
+/*
 void readBluetoothCommands()
 {
   // Signals are coming in via Bluetooth serial protocol
@@ -2444,6 +2556,7 @@ void readBluetoothCommands()
     failsafeRcSignals();
   }
 }
+*/
 
 //
 // =======================================================================================================
@@ -6503,7 +6616,8 @@ void loop()
   mcpwmOutput();      // PWM servo signal output
 
 #elif defined BLUETOOTH_COMMUNICATION
-  readBluetoothCommands(); // Bluetooth communication
+  BP32.update();
+  processControllers();
   mcpwmOutput();           // PWM servo signal output
 
 #elif defined PPM_COMMUNICATION
