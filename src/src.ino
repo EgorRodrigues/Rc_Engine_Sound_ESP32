@@ -2543,6 +2543,11 @@ void processControllers() {
 }
 
 void processGamepad(ControllerPtr ctl) {
+    // Log raw controller inputs
+    Serial.printf("Gamepad: model=%s, axisX=%d, axisY=%d, axisRX=%d, axisRY=%d, dpad=0x%02x, a=%d, b=%d, x=%d, y=%d, l1=%d, r1=%d\n",
+                  ctl->getModelName().c_str(), ctl->axisX(), ctl->axisY(), ctl->axisRX(), ctl->axisRY(), ctl->dpad(),
+                  ctl->a(), ctl->b(), ctl->x(), ctl->y(), ctl->l1(), ctl->r1());
+
     // Map PS4 controller to RC channels
     // Left stick X: steering (CH1)
     pulseWidthRaw[1] = map(ctl->axisX(), -511, 512, 1000, 2000);
@@ -2576,6 +2581,10 @@ void processGamepad(ControllerPtr ctl) {
             pulseWidthRaw[i] = 1500;
         }
     }
+
+    // Debug output for final pulseWidthRaw values
+    Serial.printf("Mapped RC pulses: CH1=%d CH2=%d CH3=%d CH4=%d CH5=%d CH6=%d CH8=%d CH9=%d\n",
+                  pulseWidthRaw[1], pulseWidthRaw[2], pulseWidthRaw[3], pulseWidthRaw[4], pulseWidthRaw[5], pulseWidthRaw[6], pulseWidthRaw[8], pulseWidthRaw[9]);
 
     // Set failsafe to false since we have data
     failSafe = false;
