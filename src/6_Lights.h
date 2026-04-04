@@ -55,4 +55,4 @@ uint8_t rearlightDimmedBrightness = 30; // tailligt brightness, if not braking, 
 uint8_t rearlightParkingBrightness = 5; // 0, if you want the taillights being off, if side lights are on, or about 5 if you want them on (0 for US Mode)
 uint8_t headlightParkingBrightness = 5; // 0, if you want the headlights being off, if side lights are on, or about 5 if you want them on (0 for US Mode)
 uint8_t reversingLightBrightness = 140; // Around 140, 50 for Landy & Ural
-uint8_t fogLightBrightness = 255;       // Around 200
+uint8_t fogLightBrightness = 255;       // Around 255, less if too bright

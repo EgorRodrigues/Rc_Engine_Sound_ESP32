@@ -4,50 +4,50 @@
 
 // Sound files (22'050 Hz, 8 bit PCM recommended) -----------------------------------------------------------------------
 // Choose the start sound (uncomment the one you want) --------
-volatile int startVolumePercentage = 100; // Adjust the start volume (usually = 100%)
-// #include "sounds/VolvoEC550ELstart.h" // Volvo EL550EL excavator
-// #include "sounds/carCranking.h" // Generic car cranking
-#include "sounds/POWERSTROKEstart2.h" // Ford Powerstroke 7.3l V8 Diesel
+volatile int startVolumePercentage = 140; // Adjust the start volume (usually = 100%)
+#include "sounds/CAT730Start.h" // CAT 730
 
 // Choose the motor idle sound (uncomment the one you want) --------
-volatile int idleVolumePercentage = 95; // Adjust the idle volume (usually = 100%, more also working, depending on sound, 50 - 60% if additional diesel knock sound is used)
-volatile int engineIdleVolumePercentage = 80; // the engine volume will be throttle dependent (usually = 40%, never more than 100%!)
-volatile int fullThrottleVolumePercentage = 140; // Volume Percentage while full throttle (for rev sound as well) 140
-#include "sounds/Pingon14Cidle.h" // Pingon 14C excavator
+volatile int idleVolumePercentage = 80; // Adjust the idle volume (usually = 100%, more also working, depending on sound, 50 - 60% if additional diesel knock sound is used)
+volatile int engineIdleVolumePercentage = 40; // the engine volume will be throttle dependent (usually = 40%, never more than 100%!)
+volatile int fullThrottleVolumePercentage = 150; // Volume Percentage while full throttle (for rev sound as well)
+#include "sounds/CAT730Idle.h" // CAT 730
+
 
 // Choose the motor revving sound (uncomment the one you want) --------
 #define REV_SOUND // uncomment this, if you want to use the separate, optional rev sound
-volatile int revVolumePercentage = 100; // Adjust the idle volume (usually = 100%, more also working, depending on sound) 130
-volatile int engineRevVolumePercentage = 50; // the engine volume will be throttle dependent (usually = 40%, never more than 100%!)
-volatile const uint16_t revSwitchPoint = 10; // The rev sound is played instead of the idle sound above this point
-volatile const uint16_t idleEndPoint = 500; // above this point, we have 100% rev and 0% idle sound volume (usually 500, min. 50 more than revSwitchPoint)
-volatile const uint16_t idleVolumeProportionPercentage = 90; // The idle sound volume proportion (rest is rev proportion) below "revSwitchPoint" (about 90 - 100%, never more than 100)
+volatile int revVolumePercentage = 55; // Adjust the idle volume (usually = 100%, more also working, depending on sound) 90
+volatile int engineRevVolumePercentage = 10; // the engine volume will be throttle dependent (usually = 40%, never more than 100%!)40
+volatile const uint16_t revSwitchPoint = 50; // The rev sound is played instead of the idle sound above this point
+volatile const uint16_t idleEndPoint = 300; // above this point, we have 100% rev and 0% idle sound volume (usually 500, min. 50 more than revSwitchPoint)
+volatile const uint16_t idleVolumeProportionPercentage = 100; // The idle sound volume proportion (rest is rev proportion) below "revSwitchPoint" (about 90 - 100%, never more than 100)
 #ifdef REV_SOUND
-#include "sounds/Pingon14Crev.h" // Pingon 14C excavator
+
+#include "sounds/CAT730Rev.h" // CAT 730
 #endif
 
 // Choose the jake brake sound (uncomment the one you want) --------
 //#define JAKE_BRAKE_SOUND // uncomment this, if you want to use the jake brake sound
-volatile int jakeBrakeVolumePercentage = 200; // Adjust the max. volume (usually = 150%)
+volatile int jakeBrakeVolumePercentage = 150; // Adjust the max. volume (usually = 150%)
 volatile int jakeBrakeIdleVolumePercentage = 0; // Adjust the min. volume (usually = 80%)
 volatile int jakeBrakeMinRpm = 200; // Adjust the min. RPM for the jake brake (around 100)
 #ifdef JAKE_BRAKE_SOUND
-//#include "sounds/Actros1863JakeBrake.h" // Actros 1863
+#include "sounds/ScaniaV8jakebrake.h" // SCANIA V8
 #endif
 
 // Choose the Diesel (or whatever) ignition "knock" sound (played in the fixed sampling rate interrupt, uncomment the one you want,
 // play around here, the results are amazing, if you hit the right combination with the idle sound!) --------
-volatile int dieselKnockVolumePercentage = 400; // Adjust the Diesel knock volume (usually = 200 - 600%) 350
-volatile int dieselKnockIdleVolumePercentage = 10; // Diesel knock volume while idling (usually = 20%)
+volatile int dieselKnockVolumePercentage = 300; // Adjust the Diesel knock volume (usually = 200 - 600%) 200
+volatile int dieselKnockIdleVolumePercentage = 0; // Diesel knock volume while idling (usually = 20%)
 volatile int dieselKnockInterval = 6; // Idle sample length divided by this number (1 - 20, depending on sound files)
 volatile int dieselKnockStartPoint = 110; // Volume will raise above this point ( usually 0, for "open pipe" exhaust about 250)
 //#define V8 // V8 engine (Ford, Scania): pulses 4 and 8 will bel louder, because only 90° gap between exhaust cycles in same manifold
 //#define V2 // V2 engine (Harley): first 2 of 4 pulses will be louder (set dieselKnockInterval to 4)
 volatile int dieselKnockAdaptiveVolumePercentage = 50; // Adjust the Diesel knock volume for the non-first knocks per engine cycle (usually = 50%)
-#include "sounds/Pingon14Cknock.h" // Pingon 14C excavator
+#include "sounds/CAT730Knock.h" // CAT 730
 
 // Adjust the additional turbo sound (set "turboVolumePercentage" to "0", if you don't want it) --------
-volatile int turboVolumePercentage = 0; // Adjust the turbo volume (usually = 70%) 15
+volatile int turboVolumePercentage = 40; // Adjust the turbo volume (usually = 70%)
 volatile int turboIdleVolumePercentage = 0; // the turbo volume will be engine rpm dependent (usually = 10%)
 #include "sounds/TurboWhistle.h" // Turbo sound, playing in parallel with engine sound!
 
@@ -58,11 +58,10 @@ volatile int chargerStartPoint = 10; // Volume will raise above this point ( usu
 #include "sounds/supercharger.h" // supercharger sound, playing in parallel with engine sound!
 
 // Adjust the additional turbo wastegate  / blowoff valve  sound (set "wastegateVolumePercentage" to "0", if you don't want it)--------
-volatile int wastegateVolumePercentage = 50; // Adjust the wastegate volume (usually = 70%, up to 250%)
+volatile int wastegateVolumePercentage = 100; // Adjust the wastegate volume (usually = 70%, up to 250%)
 volatile int wastegateIdleVolumePercentage = 1; // Wastegate sound is played, after rapid throttle drop with engaged clutch
-#include "sounds/WastegateDummy.h"
-//#include "sounds/UnimogU1000TurboWastegate.h"
-//#include "sounds/ScaniaR730V8TurboWastegate.h"
+//#include "sounds/WastegateDummy.h"
+#include "sounds/1000HpScaniaV8wastegate.h"
 
 // Adjust the additional cooling fan sound (set "fanVolumePercentage" to "0", if you don't want it) --------
 volatile int fanVolumePercentage = 0; // Adjust the fan volume (250% for Tatra 813, else 0%)
@@ -73,8 +72,8 @@ volatile int fanStartPoint = 0; // Volume will raise above this point (250 for T
 //#include "sounds/Tatra813FanNew.h" // Tatra 813 8x8 V12 Diesel Cooling Fan (use this)
 //#include "sounds/Tatra813FanNewSlow.h" // Tatra 813 8x8 V12 Diesel Cooling Fan
 #include "sounds/GenericFan.h" // Generic engine cooling fan
-
 // Choose the horn sound (uncomment the one you want) --------
+
 volatile int hornVolumePercentage = 140; // Adjust the horn volume (usually = 100%)
 //#include "sounds/TrainHorn.h" // American train horn
 //#include "sounds/HornblastersOUTLAWTrainHornShort.h" // Hornblasters outlaw train horn short
@@ -130,6 +129,7 @@ volatile int couplingVolumePercentage = 100; // Adjust the volume (usually = 100
 
 // Choose excavator specific options (use #ifdef FLYSKY_FS_I6S_EXCAVATOR remote profile) ---------
 #define EXCAVATOR_MODE // The sound controller is running in ecxavator mode!
+#define HYDROSTATIC_TRACK_MOTORS // If you have hydrostatic track motors, the hydraulic pump sound and RPM drop will be speed dependent
 
 // Choose the hydraulic pump sound (uncomment the one you want) --------
 volatile int hydraulicPumpVolumePercentage = 120; // Adjust the volume (usually = 120%)
@@ -137,16 +137,16 @@ volatile int hydraulicPumpVolumePercentage = 120; // Adjust the volume (usually 
 #include "sounds/Caterpillar323Hydraulic2.h" // Caterpillar 323 excavator (slowed down by factor 2)
 
 // Choose the hydraulic fluid flow sound (uncomment the one you want) --------
-volatile int hydraulicFlowVolumePercentage = 5; // Adjust the volume (usually = 60%)
+volatile int hydraulicFlowVolumePercentage = 0; // Adjust the volume (usually = 120%)
 #include "sounds/Caterpillar323HydraulicFlow.h" // Caterpillar 323 excavator
 
-// Choose the track rattle sound (uncomment the one you want) --------
-volatile int trackRattleVolumePercentage = 10; // Adjust the volume (usually = 150%)
+// Choose the squeaky track sound (uncomment the one you want) --------
+volatile int trackRattleVolumePercentage = 120; // Adjust the volume (usually = 150%) 150
 #include "sounds/Caterpillar323TrackRattle.h" // Caterpillar 323 excavator
 
-//#define TRACK_RATTLE_2 // If you want to use a second track rattle sound, which is played with a delay after the first one, to create a more realistic effect
+#define TRACK_RATTLE_2 // If you want to use a second track rattle sound, which is played with a delay after the first one, to create a more realistic effect
 // Choose the track rattle 2 sound (uncomment the one you want) --------
-volatile int trackRattle2VolumePercentage = 0; // Adjust the volume (usually = 150%)
+volatile int trackRattle2VolumePercentage = 150; // Adjust the volume (usually = 150%)
 const uint16_t pwmStrokeChainDriveTopSpeed = 500; //Hobbywing 1060 ESC reaches top speed at about 1800 or 1200. 1500 is neutral. This means 1500 +/- 300
 const uint16_t pwmStrokeChainDriveStartRotation = 68; // Hobbywing 1060 ESC starts to move at 1500 + this value
 const uint16_t trackRattleIntervalMin = 90; // Interval for top speed (never less than the sample duration of the track rattle sound)
@@ -157,7 +157,7 @@ const uint16_t trackRattleIntervalMax = 500; // Maximum interval between track r
 #endif
 
 // Choose the bucket rattle sound (uncomment the one you want) --------
-volatile int bucketRattleVolumePercentage = 100; // Adjust the volume (usually = 160%)
+volatile int bucketRattleVolumePercentage = 0; // Adjust the volume (usually = 160%)
 #include "sounds/Caterpillar323BucketRattle.h" // Caterpillar 323 excavator
 
 // Choose the light options --------
@@ -185,10 +185,10 @@ uint16_t clutchEngagingPoint = 500; // CEP. The "clutch" is engaging above this 
 
 // Engine parameters ----------------------------------------------------------------------------------------------------
 // Engine max. RPM in % of idle RPM. About 200% for big Diesels, 400% for fast running motors.
-uint32_t MAX_RPM_PERCENTAGE = 153; // NOTE! Was called TOP_SPEED_MULTIPLIER (TSM) in earlier versions and was a multiplier instead of a percentage!
+uint32_t MAX_RPM_PERCENTAGE = 150; // NOTE! Was called TOP_SPEED_MULTIPLIER (TSM) in earlier versions and was a multiplier instead of a percentage!
 
 // Engine mass simulation
-const int8_t acc = 2; // Acceleration step (2) 1 = slow for locomotive engine, 9 = fast for trophy truck
+const int8_t acc = 1; // Acceleration step (2) 1 = slow for locomotive engine, 9 = fast for trophy truck 2
 const int8_t dec = 1; // Deceleration step (1) 1 = slow for locomotive engine, 5 = fast for trophy truck
 
 // Vehicle type ----------------------------------------------------------------------------------------------------

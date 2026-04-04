@@ -56,13 +56,17 @@
 // Excavators -------
 // #include "vehicles/Volvo EC550ElExcavator.h" // Volvo EC550EL 55 ton ecxavator (use "FLYSKY_FS_I6S_EXCAVATOR" remote profile and SERVOS_EXCAVATOR servo profile)
 // #include "vehicles/Caterpillar323Excavator.h" // Caterpillar 323 excavator (use "FLYSKY_FS_I6S_EXCAVATOR" remote profile)
+  #include "vehicles/Caterpillar323ExcavatorNew.h" // Caterpillar 323 excavator (use "FLYSKY_FS_I6S_EXCAVATOR" remote profile, WB excavator)
 // #include "vehicles/Pingon14CExcavator.h" // Pingon 14C excavator (use "FLYSKY_FS_I6S_EXCAVATOR" remote profile)
 
 // Dozers -------
- #include "vehicles/CaterpillarD6Dozer.h" // Caterpillar D6 Dozer
+// #include "vehicles/CaterpillarD6Dozer.h" // Caterpillar D6 Dozer
 
 // Dumpers -------
 // #include "vehicles/Benford3TonDumper.h" // Benford 3 ton dumper
+
+// Tracked Loaders -------
+// #include "vehicles/Caterpillar973KLoader.h" // Caterpillar 973K tracked loader
 
 // Wheel Loaders -------
 // #include "vehicles/VolvoL120H.h"
@@ -70,6 +74,7 @@
 
 // Articulated Dump Trucks -------
 // #include "vehicles/CAT730.h" // Caterpillar 730 heavy dump truck
+// #include "vehicles/VolvoA40G.h" // Volvo A40G articulated dump truck
 
 // Rough Terrain Cranes -------
 // #include "vehicles/RoughTerrainCrane.h" // Mushroom3D Rough Terrain Crane

@@ -7,6 +7,12 @@
 - Remove in vehicle files: XENON_LIGHTS, LED_INDICATORS, INDICATOR_DIR, doubleFlashBlueLight
 - Add to EEPROM & select box: DOUBLE_CLUTCH and other transmission options
 
+### 9.15.0-b3
+- Hydraulic hissing optimized
+- WB excavator profiles added
+- Volvo A40G ADT profile added
+- CAT 323 excavator profile optimized
+
 ### 9.15.0-b2
 - Track rattling optimized, many parameters adjustable in CaterpillarD6Dozer.h
 

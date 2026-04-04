@@ -99,10 +99,11 @@ uint16_t brakeMargin = 0; // For RZ7886 motor driver and 370 motor = 10, otherwi
 // - Modellbau-Regler.de AS-12/6RW EASY ESC = 600
 // - Meccano Dumper = 500
 // - Volvo L120H loader = 500
-uint16_t escPulseSpan = 500; // 500 = full ESC power available, 1000 half ESC power available etc.
+uint16_t escPulseSpan = 640; // 500 = full ESC power available, 1000 half ESC power available etc.
 
 // Additional takeoff punch:
 // Usually 0. Enlarge it, if your motor is too weak around neutral.
+// - Hobbywing 1060 ESC & Volvo A40G = 70
 // - Hobbywing 1060 ESC & RBR/C 370 motor & 2 speed shifting transmission = 80
 // - Hobbywing 1060 ESC & stock WPL 370 motor & 2 speed shifting transmission = 10
 // - Hobbywing 1080 ESC & 35T 540 motor for TAMIYA trucks with 3 speed transmission = 40 (was 0)

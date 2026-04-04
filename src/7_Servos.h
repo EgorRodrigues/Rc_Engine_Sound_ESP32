@@ -32,8 +32,10 @@
 // #define SERVOS_MECCANO_DUMPER
 // #define SERVOS_OPEN_RC_TRACTOR
 // NOTICE: The following profiles are for EXCAVATOR_MODE only! ---------------------
- #define SERVOS_EXCAVATOR // For excavators with electric actuators
+//#define SERVOS_EXCAVATOR // For excavators with electric actuators
+ #define SERVOS_EXCAVATOR_1060_ESC // For excavators with electric actuators, driven by Hobbywing 1060 ESC (range about 1200 - 1800, 1500 is neutral)
 // #define SERVOS_HYDRAULIC_EXCAVATOR // For hydraulic excavators
+// #define SERVOS_WB_EXCAVATOR // For WB excavators
 // #define SERVOS_CRANE // For Mushroom3D rough terrain crane (servo outputs used as outrigger channels SBUS decoder)
 
 // Default servo configuration profile -------------------------------------------------------------------------------------------
@@ -284,9 +286,34 @@ uint16_t CH4L = 1000, CH4C = 1500, CH4R = 2000; // CH4 swing ESC
 
 // Servo ramp times
 uint16_t CH1_RAMP_TIME = 0; // 0 = fastest speed, enlarge it to around 3000 for "scale" servo movements
-uint16_t CH2_RAMP_TIME = 100;
-uint16_t CH3_RAMP_TIME = 1000;
-uint16_t CH4_RAMP_TIME = 2000;
+uint16_t CH2_RAMP_TIME = 100; // 100 for Volvo 550
+uint16_t CH3_RAMP_TIME = 1000; // 1000 for Volvo 550
+uint16_t CH4_RAMP_TIME = 2000; // 2000 for Volvo 550
+
+#endif
+
+// Electric excavator servo configuration profile for Hobbywing 1060 ESC-----------------------------------------------------------------------
+#ifdef SERVOS_EXCAVATOR_1060_ESC
+
+boolean boomDownwardsHydraulic = true; // hydraulic load sound as well for boom downwards
+boolean reverseBoomSoundDirection = false; // reverse sound direction, if needed (for example if hoses can't be swapped)
+
+// Servo frequency
+const uint8_t SERVO_FREQUENCY = 50; // usually 50Hz, some servos may run smoother @ 100Hz
+
+// WARNING: never connect receiver PWM signals to the "CH" pins in BUS communication mode!
+
+// Servo limits
+uint16_t CH1L = 1200, CH1C = 1500, CH1R = 1800; // CH1 bucket ESC
+uint16_t CH2L = 1200, CH2C = 1500, CH2R = 1800; // CH2 dipper ESC
+uint16_t CH3L = 1200, CH3C = 1500, CH3R = 1800; // CH3 boom ESC
+uint16_t CH4L = 1200, CH4C = 1500, CH4R = 1800; // CH4 swing ESC
+
+// Servo ramp times
+uint16_t CH1_RAMP_TIME = 0; // 0 = fastest speed, enlarge it to around 3000 for "scale" servo movements
+uint16_t CH2_RAMP_TIME = 50; // 100 for Volvo 550
+uint16_t CH3_RAMP_TIME = 500; // 1000 for Volvo 550
+uint16_t CH4_RAMP_TIME = 2000; // 2000 for Volvo 550
 
 #endif
 
@@ -321,6 +348,38 @@ uint16_t CH1_RAMP_TIME = 0; // always 0 for now
 uint16_t CH2_RAMP_TIME = 0; // always 0 for now
 uint16_t CH3_RAMP_TIME = 0; // always 0 for now
 uint16_t CH4_RAMP_TIME = 2500; // 2000 for swing motor protection (2500 for Pingon)
+
+#endif
+
+// WB excavator servo configuration profile -------------------------------------------------------------------------------------------
+#ifdef SERVOS_WB_EXCAVATOR
+
+boolean boomDownwardsHydraulic = true; // hydraulic load sound as well for boom downwards
+boolean reverseBoomSoundDirection = false; // reverse sound direction, if needed (for example if hoses can't be swapped)
+
+// Servo frequency
+const uint8_t SERVO_FREQUENCY = 50; // usually 50Hz, some servos may run smoother @ 100Hz
+
+// WARNING: never connect receiver PWM signals to the "CH" pins in BUS communication mode!
+
+// Valve servo limits
+uint16_t CH1L = 1000, CH1C = 1500, CH1R = 2000; // CH1 bucket valve
+uint16_t CH2L = 1000, CH2C = 1500, CH2R = 2000; // CH2 dipper valve
+uint16_t CH3L = 1000, CH3C = 1500, CH3R = 2000; // CH3 boom valve
+
+// Swing ESC limits
+uint16_t CH4L = 1000, CH4C = 1500, CH4R = 2000; // CH4 swing ESC
+
+// Hydraulic pump limits (not used for now, mixed in the remote)
+uint16_t ESC_L = 1000, ESC_C = 1500, ESC_R = 2000; // ESC output for oil pump (always 1000, 1500, 2000)
+uint16_t ESC_MIN = 1500; // Pump off
+uint16_t ESC_MAX = 1800; // Pump max. RPM (1800 for Pingon)
+
+// Servo ramp times
+uint16_t CH1_RAMP_TIME = 0; // always 0 for now
+uint16_t CH2_RAMP_TIME = 0; // always 0 for now
+uint16_t CH3_RAMP_TIME = 0; // always 0 for now
+uint16_t CH4_RAMP_TIME = 1000; // 1000 for swing motor protection
 
 #endif
 

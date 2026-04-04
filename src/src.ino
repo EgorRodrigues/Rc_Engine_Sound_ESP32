@@ -17,7 +17,7 @@
    Arduino IDE is supported as well, but I recommend to use VS Code, because libraries and boards are managed automatically.
 */
 
-char codeVersion[] = "9.15.0-b2"; // Software revision.
+char codeVersion[] = "9.15.0-b3"; // Software revision.
 
 //
 // =======================================================================================================
@@ -46,17 +46,17 @@ char codeVersion[] = "9.15.0-b2"; // Software revision.
 #include <Arduino.h>
 
 // All the required user settings are done in the following .h files:
-#include "0_GeneralSettings.h" // <<------- general settings
-#include "1_Vehicle.h"         // <<------- Select the vehicle you want to simulate
-#include "2_Remote.h"          // <<------- Remote control system related adjustments
-#include "3_ESC.h"             // <<------- ESC related adjustments
-#include "4_Transmission.h"    // <<------- Transmission related adjustments
-#include "5_Shaker.h"          // <<------- Shaker related adjustments
-#include "6_Lights.h"          // <<------- Lights related adjustments
-#include "7_Servos.h"          // <<------- Servo output related adjustments
-#include "8_Sound.h"           // <<------- Sound related adjustments
-#include "9_Dashboard.h"       // <<------- Dashboard related adjustments
-#include "10_Trailer.h"        // <<------- Trailer related adjustments
+#include "./0_GeneralSettings.h" // <<------- general settings
+#include "./1_Vehicle.h"         // <<------- Select the vehicle you want to simulate
+#include "./2_Remote.h"          // <<------- Remote control system related adjustments
+#include "./3_ESC.h"             // <<------- ESC related adjustments
+#include "./4_Transmission.h"    // <<------- Transmission related adjustments
+#include "./5_Shaker.h"          // <<------- Shaker related adjustments
+#include "./6_Lights.h"          // <<------- Lights related adjustments
+#include "./7_Servos.h"          // <<------- Servo output related adjustments
+#include "./8_Sound.h"           // <<------- Sound related adjustments
+#include "./9_Dashboard.h"       // <<------- Dashboard related adjustments
+#include "./10_Trailer.h"        // <<------- Trailer related adjustments
 
 // TODO = Things to clean up!
 
@@ -365,7 +365,7 @@ uint16_t pulseLimit = 1100;           // pulseZero +/- this value (1100)
 uint16_t pulseMinValid = 700;         // The minimum valid pulsewidth (was 950)
 uint16_t pulseMaxValid = 2300;        // The maximum valid pulsewidth (was 2050)
 bool autoZeroDone;                    // Auto zero offset calibration done
-#define NONE 0                        // The non existing "Dummy" channel number (usually 0) TODO, was 16
+#define NONE 0                        // The non existing "Dummy" channel number (usually 0)
 
 volatile boolean failSafe = false; // Triggered in emergency situations like: throttle signal lost etc.
 
@@ -2404,6 +2404,9 @@ void readIbusCommands()
   pulseWidthRaw[11] = iBus.readChannel(HAZARDS - 1);         // CH11
   pulseWidthRaw[12] = iBus.readChannel(INDICATOR_LEFT - 1);  // CH12
   pulseWidthRaw[13] = iBus.readChannel(INDICATOR_RIGHT - 1); // CH13
+  pulseWidthRaw[14] = iBus.readChannel(CH_14 - 1);           // CH14  14 - 16 are just dummies, not supported in IBUS mode
+  pulseWidthRaw[15] = iBus.readChannel(CH_15 - 1);           // CH15
+  pulseWidthRaw[16] = iBus.readChannel(CH_16 - 1);           // CH16
 
   if (ibusInit)
   {
@@ -2743,7 +2746,7 @@ bool beaconControl(uint8_t pulses)
 
 void mcpwmOutput()
 {
-#if not defined SERVOS_EXCAVATOR && not defined SERVOS_HYDRAULIC_EXCAVATOR && not defined SERVOS_CRANE // Servo outputs, if not used in special vehicle servo mode **********************
+#if not defined SERVOS_EXCAVATOR && not defined SERVOS_EXCAVATOR_1060_ESC && not defined SERVOS_HYDRAULIC_EXCAVATOR && not defined SERVOS_WB_EXCAVATOR && not defined SERVOS_CRANE // Servo outputs, if not used in special vehicle servo mode **********************
 
   if (autoZeroDone) // Only generate servo signals, if auto zero was successful!
   {
@@ -3001,6 +3004,8 @@ void mcpwmOutput()
       // Serial.printf(" Bucket: %i µs\n", pulseWidth[1]);
       mcpwm_set_duty_in_us(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, pulseWidth[1]);
 #else
+      pulseWidth[1] = map(pulseWidth[1], pulseMin[1], pulseMax[1], CH1L, CH1R); // TODO, is this OK??
+      // Serial.printf(" Bucket: %i µs\n", pulseWidth[1]);
       mcpwm_set_duty_in_us(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, pulseWidth[1]);
 #endif
     }
@@ -3030,6 +3035,8 @@ void mcpwmOutput()
       // Serial.printf(" Dipper: %i µs\n", pulseWidth[2]);
       mcpwm_set_duty_in_us(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, pulseWidth[2]);
 #else
+      pulseWidth[2] = map(pulseWidth[2], pulseMin[2], pulseMax[2], CH2L, CH2R); // TODO, is this OK??
+      // Serial.printf(" Dipper: %i µs\n", pulseWidth[2]);
       mcpwm_set_duty_in_us(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, pulseWidth[2]);
 #endif
     }
@@ -3059,6 +3066,8 @@ void mcpwmOutput()
       // Serial.printf(" Boom: %i µs\n", pulseWidth[5]);
       mcpwm_set_duty_in_us(MCPWM_UNIT_0, MCPWM_TIMER_1, MCPWM_OPR_B, pulseWidth[5]);
 #else
+      pulseWidth[5] = map(pulseWidth[5], pulseMin[5], pulseMax[5], CH3L, CH3R); // TODO, is this OK??
+      // Serial.printf(" Boom: %i µs\n", pulseWidth[5]);
       mcpwm_set_duty_in_us(MCPWM_UNIT_0, MCPWM_TIMER_1, MCPWM_OPR_B, pulseWidth[5]);
 #endif
     }
@@ -4222,20 +4231,20 @@ void led()
   if (pulseWidth[9] > 1900 && pulseWidth[9] < pulseMaxLimit[9])
   {
     headLightsSub(true, true, false, false); // Headlights on (head, fog, roof, park)
-    sideLight.on();
-    tailLight.on();
+    sideLight.pwm(constrain(sideLightsBrightness - crankingDim, (sideLightsBrightness / 2), 255));
+    tailLight.pwm(255 - crankingDim); 
   }
   else if (pulseWidth[9] > 1400 && pulseWidth[9] < pulseMaxLimit[9])
   {
     headLightsSub(true, false, false, false); // Headlights on (head, fog, roof, park)
     sideLight.off();
-    tailLight.on();
+    tailLight.pwm(255 - crankingDim); 
   }
   else if (pulseWidth[9] > 1200 && pulseWidth[9] < pulseMaxLimit[9])
   {
     headLightsSub(false, false, false, false); // Headlights off
     sideLight.off();
-    tailLight.on();
+    tailLight.pwm(255 - crankingDim); 
   }
   else
   {
@@ -5947,7 +5956,7 @@ void excavatorControl()
 #if defined EXCAVATOR_MODE
 
   static uint32_t lastFrameTime = millis();
-  static uint16_t hydraulicPumpVolumeInternal[9];
+  static uint16_t hydraulicPumpVolumeInternal[17];
   static uint16_t hydraulicPumpVolumeInternalUndelayed;
   static uint16_t hydraulicFlowVolumeInternalUndelayed;
   static uint16_t trackRattleVolumeInternal[9];
@@ -6009,27 +6018,43 @@ void excavatorControl()
     else
       hydraulicPumpVolumeInternal[8] = 0;
 
+      // AUX1 hydraulics ---
+    if (pulseWidth[15] > pulseMaxNeutral[15])
+      hydraulicPumpVolumeInternal[15] = map(pulseWidth[15], pulseMaxNeutral[15], (pulseMax[15] - 150), 0, 50);
+    else if (pulseWidth[15] < pulseMinNeutral[15])
+      hydraulicPumpVolumeInternal[15] = map(pulseWidth[15], pulseMinNeutral[15], (pulseMin[15] + 150), 0, 50);
+    else
+      hydraulicPumpVolumeInternal[15] = 0;
+
+      // AUX2 hydraulics---
+    if (pulseWidth[16] > pulseMaxNeutral[16])
+      hydraulicPumpVolumeInternal[16] = map(pulseWidth[16], pulseMaxNeutral[16], (pulseMax[16] - 150), 0, 50);
+    else if (pulseWidth[16] < pulseMinNeutral[16])
+      hydraulicPumpVolumeInternal[16] = map(pulseWidth[16], pulseMinNeutral[16], (pulseMin[16] + 150), 0, 50);
+    else
+      hydraulicPumpVolumeInternal[16] = 0;
+
 #if defined HYDROSTATIC_TRACK_MOTORS
     // Hydrostatic track motors ---
     // Left
     if (pulseWidth[6] > pulseMaxNeutral[6])
-      hydraulicPumpVolumeInternal[6] = map(pulseWidth[6], pulseMaxNeutral[6], pulseMax[6], 0, 100);
+      hydraulicPumpVolumeInternal[6] = map(pulseWidth[6], pulseMaxNeutral[6], pulseMax[6], 0, 95);
     else if (pulseWidth[6] < pulseMinNeutral[6])
-      hydraulicPumpVolumeInternal[6] = map(pulseWidth[6], pulseMinNeutral[6], pulseMin[6], 0, 100);
+      hydraulicPumpVolumeInternal[6] = map(pulseWidth[6], pulseMinNeutral[6], pulseMin[6], 0, 95);
     else
       hydraulicPumpVolumeInternal[6] = 0;
 
     // Right
     if (pulseWidth[7] > pulseMaxNeutral[7])
-      hydraulicPumpVolumeInternal[7] = map(pulseWidth[7], pulseMaxNeutral[7], pulseMax[7], 0, 100);
+      hydraulicPumpVolumeInternal[7] = map(pulseWidth[7], pulseMaxNeutral[7], pulseMax[7], 0, 95);
     else if (pulseWidth[7] < pulseMinNeutral[7])
-      hydraulicPumpVolumeInternal[7] = map(pulseWidth[7], pulseMinNeutral[7], pulseMin[7], 0, 100);
+      hydraulicPumpVolumeInternal[7] = map(pulseWidth[7], pulseMinNeutral[7], pulseMin[7], 0, 95);
     else
       hydraulicPumpVolumeInternal[7] = 0;
 #endif
 
     // Hydraulic calculations ---
-    hydraulicPumpVolumeInternalUndelayed = constrain(hydraulicPumpVolumeInternal[1] + hydraulicPumpVolumeInternal[2] + hydraulicPumpVolumeInternal[5] + hydraulicPumpVolumeInternal[6] + hydraulicPumpVolumeInternal[7] + hydraulicPumpVolumeInternal[8], 0, 100) * map(currentRpm, 0, 500, 30, 100) / 100;
+    hydraulicPumpVolumeInternalUndelayed = constrain(hydraulicPumpVolumeInternal[1] + hydraulicPumpVolumeInternal[2] + hydraulicPumpVolumeInternal[5] + hydraulicPumpVolumeInternal[6] + hydraulicPumpVolumeInternal[7] + hydraulicPumpVolumeInternal[8]+ hydraulicPumpVolumeInternal[15]+ hydraulicPumpVolumeInternal[16], 0, 100) * map(currentRpm, 0, 500, 30, 100) / 100;
 
     if (hydraulicPumpVolumeInternalUndelayed < hydraulicPumpVolume)
       hydraulicPumpVolume--;
