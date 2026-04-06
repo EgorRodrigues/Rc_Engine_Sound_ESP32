@@ -122,7 +122,8 @@ volatile int parkingBrakeVolumePercentage = 130; // Adjust the brake volume (usu
 volatile int shiftingVolumePercentage = 100; // Adjust the shifting volume (usually = 200%)
 //#include "sounds/AirShiftingDummy.h" // If you don't want pneumatic shifting sound
 //#include "sounds/AirShifting.h" // Pneumatic shifting sound
-#include "sounds/ClunkingGearShifting.h" // Manual clunking shifting sound
+#include "sounds/Mercedes_SK_1935_V8_AirShifting.h" // Mercedes SK air shifting
+//#include "sounds/ClunkingGearShifting.h" // Manual clunking shifting sound
 
 // Choose the additional "sound1" (uncomment the one you want) --------
 volatile int sound1VolumePercentage = 100; // Adjust the sound1 volume (usually = 100%)
@@ -140,7 +141,8 @@ volatile int reversingVolumePercentage = 0; // Adjust the reversing sound volume
 volatile int indicatorVolumePercentage = 100; // Adjust the indicator sound volume (usually = 100%)
 const uint16_t indicatorOn = 300; // The indicator will be switched on above +/- this value, if wheels are turned
 const boolean INDICATOR_DIR = true; // adjust indicator direction with true or false
-#include "sounds/Indicator.h" // "Tick-Tack" sound
+#include "sounds/Mercedes_SK_2635_V8_Indicator.h" // Mercedes SK
+//#include "sounds/Indicator.h" // "Tick-Tack" sound
 
 // Choose the trailer couplig & uncoupling sounds (uncomment the ones you want) --------
 #define COUPLING_SOUND // uncomment this, if you want to use the trailer coupling & uncoupling sounds

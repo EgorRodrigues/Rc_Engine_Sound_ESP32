@@ -17,7 +17,7 @@
    Arduino IDE is supported as well, but I recommend to use VS Code, because libraries and boards are managed automatically.
 */
 
-char codeVersion[] = "9.15.0-b4"; // Software revision.
+char codeVersion[] = "9.15.0-b5"; // Software revision.
 
 //
 // =======================================================================================================
@@ -297,9 +297,10 @@ int pos2 = 0;
 // determines how many clock cycles one "tick" is
 // [1..255], source is generally 80MHz APB clk
 #define RMT_RX_CLK_DIV (80000000 / RMT_TICK_PER_US / 1000000)
-// time before receiver goes idle (longer pulses will be ignored)
-#define RMT_RX_MAX_US 3500
+// idle threshold for RMT receiver in microseconds
+#define RMT_RX_MAX_US 12000
 volatile uint16_t pwmBuf[PWM_CHANNELS_NUM + 2] = {0};
+static RingbufHandle_t pwmRingbuf[PWM_CHANNELS_NUM] = {0};
 uint32_t maxPwmRpmPercentage = 390; // Limit required to prevent controller from crashing @ high engine RPM
 
 // PPM signal processing variables
@@ -1456,64 +1457,56 @@ static void IRAM_ATTR rmt_isr_handler(void *arg)
 {
   // Get RMT interrupt status register (compatible with all ESP32 platform versions)
   uint32_t intr_st = RMT.int_st.val;
-  
-  static uint32_t lastFrameTime = millis();
 
-  if (millis() - lastFrameTime > 20)
-  { // Only do it every 20ms (very important for system stability)
-
-    // See if we can obtain or "Take" the Semaphore.
-    // If the semaphore is not available, wait 1 ticks of the Scheduler to see if it becomes free.
-    if (xSemaphoreTake(xPwmSemaphore, portMAX_DELAY))
-    {
-      // We were able to obtain or "Take" the semaphore and can now access the shared resource.
-      // We want to have the pwmBuf variable for us alone,
-      // so we don't want it getting stolen during the middle of a conversion.
-
-      uint8_t i;
-      for (i = 0; i < PWM_CHANNELS_NUM; i++)
-      {
-        uint8_t channel = PWM_CHANNELS[i];
-        uint32_t channel_mask = BIT(channel * 3 + 1);
-
-        if (!(intr_st & channel_mask))
-          continue;
-
-        // Disable RX for this channel to read data
-        RMT.conf_ch[channel].conf1.rx_en = 0;
-        
-        // Switch memory owner to TX to read data
-        RMT.conf_ch[channel].conf1.mem_owner = RMT_MEM_OWNER_TX;
-        
-        // Get pointer to RMT memory for this channel
-        volatile rmt_item32_t *item = RMTMEM.chan[channel].data32;
-
-        // Read the pulse width from first item (duration0)
-        if (item)
-        {
-          pwmBuf[i + 1] = item->duration0; // pointer -> variable
-        }
-
-        // Reset write address to beginning of memory
-        RMT.conf_ch[channel].conf1.mem_wr_rst = 1;
-        
-        // Switch memory owner back to RX
-        RMT.conf_ch[channel].conf1.mem_owner = RMT_MEM_OWNER_RX;
-        
-        // Re-enable RX for this channel
-        RMT.conf_ch[channel].conf1.rx_en = 1;
-
-        // Clear RMT interrupt status for this channel
-        RMT.int_clr.val = channel_mask;
-      }
-
-      xSemaphoreGive(xPwmSemaphore); // Now free or "Give" the semaphore for others.
-    }
-    lastFrameTime = millis();
-  }
-  else
+  uint8_t i;
+  for (i = 0; i < PWM_CHANNELS_NUM; i++)
   {
-    xSemaphoreGive(xPwmSemaphore); // Free or "Give" the semaphore for others, if not required!
+    uint8_t channel = PWM_CHANNELS[i];
+    uint32_t channel_mask = BIT(channel * 3 + 1);
+
+    if (!(intr_st & channel_mask))
+      continue;
+
+    // Disable RX for this channel to read data
+    RMT.conf_ch[channel].conf1.rx_en = 0;
+
+    // Switch memory owner to TX to read data
+    RMT.conf_ch[channel].conf1.mem_owner = RMT_MEM_OWNER_TX;
+
+    // Get pointer to RMT memory for this channel
+    volatile rmt_item32_t *item = RMTMEM.chan[channel].data32;
+    uint16_t width = 0;
+
+    if (item)
+    {
+      for (uint8_t idx = 0; idx < 16; idx++)
+      {
+        if (item[idx].level0 == 1 && item[idx].duration0 >= 500 && item[idx].duration0 <= 2500)
+        {
+          width = item[idx].duration0;
+          break;
+        }
+        if (item[idx].level1 == 1 && item[idx].duration1 >= 500 && item[idx].duration1 <= 2500)
+        {
+          width = item[idx].duration1;
+          break;
+        }
+      }
+    }
+
+    pwmBuf[i + 1] = width;
+
+    // Reset write address to beginning of memory
+    RMT.conf_ch[channel].conf1.mem_wr_rst = 1;
+
+    // Switch memory owner back to RX
+    RMT.conf_ch[channel].conf1.mem_owner = RMT_MEM_OWNER_RX;
+
+    // Re-enable RX for this channel
+    RMT.conf_ch[channel].conf1.rx_en = 1;
+
+    // Clear RMT interrupt status for this channel
+    RMT.int_clr.val = channel_mask;
   }
 }
 
@@ -2115,36 +2108,31 @@ void setup()
     };
     gpio_config(&io_conf);
     
-    // Connect GPIO to RMT
-    rmt_set_pin((rmt_channel_t)channel, RMT_MODE_RX, pin);
-    
-    // Configure RMT channel
-    RMT.conf_ch[channel].conf0.div_cnt = RMT_RX_CLK_DIV;
-    RMT.conf_ch[channel].conf1.mem_block_num = 1;
-    RMT.conf_ch[channel].conf1.tx_conti_mode = 0; // Not in TX continuous mode
-    RMT.conf_ch[channel].conf1.rx_en = 0;         // Start disabled
-    RMT.conf_ch[channel].conf1.mem_owner = RMT_MEM_OWNER_RX;
-    RMT.conf_ch[channel].conf1.mem_wr_rst = 1;    // Reset write pointer
-    
-    // Set idle threshold (pulses longer than this will trigger idle interrupt)
-    RMT.conf_ch[channel].conf0.idle_thres = RMT_RX_MAX_US * RMT_TICK_PER_US;
-    
-    // Enable filter to ignore short pulses
-    RMT.conf_ch[channel].conf1.rx_filter_en = 1;
-    RMT.conf_ch[channel].conf1.rx_filter_thres = 100; // Pulses shorter than this will be filtered out
-    
-    // Clear any pending interrupts
-    RMT.int_clr.val = BIT(channel * 3 + 1);
-    
-    // Enable interrupt for this channel
-    RMT.int_ena.val |= BIT(channel * 3 + 1);
-    
-    // Enable RX for this channel
-    RMT.conf_ch[channel].conf1.rx_en = 1;
+    // Configure RMT channel via the ESP32 RMT driver
+    rmt_config_t rmt_rx = RMT_DEFAULT_CONFIG_RX(pin, (rmt_channel_t)channel);
+    rmt_rx.clk_div = RMT_RX_CLK_DIV;
+    rmt_rx.mem_block_num = 1;
+    rmt_rx.rx_config.idle_threshold = RMT_RX_MAX_US;
+    rmt_rx.rx_config.filter_en = true;
+    rmt_rx.rx_config.filter_ticks_thresh = 100;
+    rmt_config(&rmt_rx);
+
+    esp_err_t err = rmt_driver_install(rmt_rx.channel, 2048, 0);
+    if (err != ESP_OK)
+    {
+      Serial.printf("RMT driver install failed for channel %d: %d\n", channel, err);
+    }
+    else
+    {
+      if (rmt_get_ringbuf_handle(rmt_rx.channel, &pwmRingbuf[i]) != ESP_OK)
+      {
+        Serial.printf("RMT ringbuf handle failed for channel %d\n", channel);
+      }
+      rmt_rx_start(rmt_rx.channel, true);
+    }
   }
 
-  // Register the RMT interrupt handler
-  rmt_isr_register(rmt_isr_handler, NULL, 0, NULL);
+  // No custom RMT ISR is required when using the RMT driver and ring buffers.
 
 #endif // -----------------------------------------------------------
 
@@ -2304,27 +2292,47 @@ void readPwmSignals()
 
   if (millis() - lastFrameTime > 20)
   { // Only do it every 20ms
-    // measure RC signal pulsewidth:
-    // nothing is done here, the PWM signals are now read, using the
-    // "static void IRAM_ATTR rmt_isr_handler(void* arg)" interrupt function
+    // measure RC signal pulsewidth using the RMT driver ring buffer
 
     // NOTE: There is no channel mapping in this mode! Just plug in the wires in the order as defined in "2_adjustmentsRemote.h"
     // for example: sound controller channel 2 (GEARBOX) connects to receiver channel 6
 
-    // See if we can obtain or "Take" the Semaphore.
-    // If the semaphore is not available, wait 1 ticks of the Scheduler to see if it becomes free.
-    if (xSemaphoreTake(xPwmSemaphore, portMAX_DELAY))
+    for (uint8_t i = 0; i < PWM_CHANNELS_NUM; i++)
     {
-      // We were able to obtain or "Take" the semaphore and can now access the shared resource.
-      // We want to have the pwmBuf variable for us alone,
-      // so we don't want it getting stolen during the middle of a conversion.
-      for (uint8_t i = 1; i < PWM_CHANNELS_NUM + 1; i++)
+      if (pwmRingbuf[i] != NULL)
       {
-        if (pwmBuf[i] > 500 && pwmBuf[i] < 2500)
-          pulseWidthRaw[i] = pwmBuf[i]; // Only take valid signals!
+        while (true)
+        {
+          size_t item_size = 0;
+          rmt_item32_t *items = (rmt_item32_t *)xRingbufferReceive(pwmRingbuf[i], &item_size, 0);
+          if (items == NULL)
+            break;
+
+          uint16_t width = 0;
+          uint16_t item_count = item_size / sizeof(rmt_item32_t);
+          for (uint16_t idx = 0; idx < item_count; idx++)
+          {
+            if (items[idx].level0 == 1 && items[idx].duration0 >= 500 && items[idx].duration0 <= 2500)
+            {
+              width = items[idx].duration0;
+            }
+            else if (items[idx].level1 == 1 && items[idx].duration1 >= 500 && items[idx].duration1 <= 2500)
+            {
+              width = items[idx].duration1;
+            }
+          }
+          if (width > 0)
+          {
+            pwmBuf[i + 1] = width;
+          }
+          vRingbufferReturnItem(pwmRingbuf[i], (void *)items);
+        }
       }
 
-      xSemaphoreGive(xPwmSemaphore); // Now free or "Give" the semaphore for others.
+      if (pwmBuf[i + 1] > 500 && pwmBuf[i + 1] < 2500)
+      {
+        pulseWidthRaw[i + 1] = pwmBuf[i + 1]; // Only take valid signals!
+      }
     }
 
     // Normalize, auto zero and reverse channels
@@ -2335,10 +2343,6 @@ void readPwmSignals()
     failsafeRcSignals();
 
     lastFrameTime = millis();
-  }
-  else
-  {
-    xSemaphoreGive(xPwmSemaphore); // Free or "Give" the semaphore for others, if not required!
   }
 }
 

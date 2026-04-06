@@ -1395,6 +1395,8 @@ void webInterface()
                 valueString = header.substring(pos1 + 1, pos2);
                 neopixelMode = (valueString.toInt());
                 setupNeopixel();
+                EEPROM.writeUShort(adr_eprom_neopixelMode, neopixelMode);
+                EEPROM.commit();
                 Serial.println("neopixelMode = " + String(neopixelMode));
               }
 

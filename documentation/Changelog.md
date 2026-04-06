@@ -1,11 +1,15 @@
 # Changelog
 
 ### Known issues:
-- PWM mode may still not work, use version v9.11.0, if you want to use PWM mode
+- ? let me know
 
 ### Todo:
 - Remove in vehicle files: XENON_LIGHTS, LED_INDICATORS, INDICATOR_DIR, doubleFlashBlueLight
 - Add to EEPROM & select box: DOUBLE_CLUTCH and other transmission options
+
+### 9.15.0-b5
+- PWM input mode fixed. After a long time it is now usable again!
+- IBUS and SBUS mode tested as well and working
 
 ### 9.15.0-b4
 - Migrated to the latest espressif32 platform, it may still contain bugs, but works for me so far, more tests required

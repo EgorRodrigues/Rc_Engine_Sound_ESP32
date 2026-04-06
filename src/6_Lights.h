@@ -12,7 +12,7 @@
 
 // Neopixel settings ----------------------------------------------------------------------------------------------------------------------------------------
 // Note: Neopixels only usable, if not in PWM mode, otherwise disable it!
-// #define NEOPIXEL_ENABLED  // GPIO0 used for WS2812 Neopixel control, if defined! you can disable it, if not requierd
+ #define NEOPIXEL_ENABLED  // GPIO0 used for WS2812 Neopixel control, if defined! you can disable it, if not requierd
 #if defined NEOPIXEL_ENABLED // only selectable, if NEOPIXELS are in use ---
 // #define NEOPIXEL_ON_CH4 // The CH 4 servo header is used as Neopixel output, if defined (BUS communication mode only, intended for RC trailer controller, no coupler servo)
 #endif                          // ---
@@ -29,7 +29,7 @@
  * 4 = Union Jack United Kingdom animation for 8 LED (use it in combination with "BritishNationalAnthemSiren.h" sound in your vehicle file)
  * 5 = B33lz3bub Austria animation for 3 LED: https://www.rc-modellbau-portal.de/index.php?threads/baubericht-mercedes-actros-1851-gigaspace-tamiya.14349/page-3
  */
-uint8_t neopixelMode = 2; // See above
+uint8_t neopixelMode = 3; // See above
 
 // These light settings are adjustabale during compile time only ---------------------------------------------------------------------------------------------
 #define THIRD_BRAKELIGHT // if defined, pin 32 is used for a third brake light, otherwise for a trailer presence switch (pulled to GND = no trailer attached)
