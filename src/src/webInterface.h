@@ -41,12 +41,26 @@ void webInterface()
             // that's the end of the client HTTP request, so send a response:
             if (currentLine.length() == 0)
             {
-              // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-              // and a content-type so the client knows what's coming, then a blank line:
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-type:text/html");
-              client.println("Connection: close");
-              client.println();
+              // Check for save request
+              if (header.indexOf("GET /save/on") >= 0)
+              {
+                // Send redirect response
+                client.println("HTTP/1.1 302 Found");
+                client.println("Location: /");
+                client.println("Connection: close");
+                client.println();
+                eepromWrite();
+                delay(1000);
+                ESP.restart();
+              }
+              else
+              {
+                // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+                // and a content-type so the client knows what's coming, then a blank line:
+                client.println("HTTP/1.1 200 OK");
+                client.println("Content-type:text/html");
+                client.println("Connection: close");
+                client.println();
 
               // Display the HTML web page
               client.println("<!DOCTYPE html><html>");
@@ -1393,12 +1407,6 @@ void webInterface()
               // button1 (Save settings to EEPROM) ----------------------------------
               client.println("<p><a href=\"/save/on\"><button class=\"button buttonRed\" onclick=\"restartPopup()\" >Save settings & restart</button></a></p>");
 
-              if (header.indexOf("GET /save/on") >= 0)
-              {
-                eepromWrite();
-                delay(1000);
-                ESP.restart();
-              }
               client.println("<script> function restartPopup() {");
               client.println("alert(\"Controller restarted, you may need to reconnect WiFi!\"); ");
               client.println("} </script>");
@@ -1424,6 +1432,7 @@ void webInterface()
 
               // The HTTP-response ends with an empty column
               client.println();
+              }
               // Break out of the while loop
               break;
             }

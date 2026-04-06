@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+#define VEHICLE_NAME "2021 Jeep Wrangler Rubicon HEMI 392 V8 (starter needs rework)"
+
 // Vehicle specific settings for sound, lights, ESC, transmission. This is a vehicle specific file.
 
 // Sound files (22'050 Hz, 8 bit PCM recommended) -----------------------------------------------------------------------

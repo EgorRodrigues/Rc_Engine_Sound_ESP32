@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+#define VEHICLE_NAME "This master preset file contains all available sound files, which are not used in existing vehicle presets"
+
 // Vehicle specific settings for sound, lights, ESC, transmission.
 // This master file is containing all available sounds, which are not already used in pre made configurations
 

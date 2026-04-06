@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+#define VEHICLE_NAME "Dodge RAM 2500 with inline 6, 12V Cummins 5.9l Diesel, automatic transmission"
+
 // Vehicle specific settings for sound, lights, ESC, transmission. This is a vehicle specific file.
 
 // Sound files (22'050 Hz, 8 bit PCM recommended) -----------------------------------------------------------------------

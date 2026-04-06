@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+#define VEHICLE_NAME "Union Pacific 2002 SD70M locomotive with enormous, low revving 16 cylinder Diesel"
+
 // Vehicle specific settings for sound, lights, ESC, transmission. This is a vehicle specific file.
 
 // Sound files (22'050 Hz, 8 bit PCM recommended) -----------------------------------------------------------------------

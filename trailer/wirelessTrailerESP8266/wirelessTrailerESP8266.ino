@@ -43,6 +43,11 @@ typedef struct struct_message { // This is the data packet
   uint8_t reversingLight;
   uint8_t indicatorL;
   uint8_t indicatorR;
+  bool legsUp;
+  bool legsDown;
+  bool rampsUp;
+  bool rampsDown;
+  bool beaconsOn;
 } struct_message;
 
 // Create a struct_message called trailerData

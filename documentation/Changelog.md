@@ -7,6 +7,11 @@
 - Remove in vehicle files: XENON_LIGHTS, LED_INDICATORS, INDICATOR_DIR, doubleFlashBlueLight
 - Add to EEPROM & select box: DOUBLE_CLUTCH and other transmission options
 
+### 9.15.0-b4
+- Migrated to the latest espressif32 platform, it may still contain bugs, but works for me so far, more tests required
+- Web configuration page 192.168.4.1 now properly displayed instead of 192.168.4.1/save/on after "Save settings & restart"
+- WiFi & ESP-Now should be more stable
+
 ### 9.15.0-b3
 - Hydraulic hissing optimized
 - WB excavator profiles added

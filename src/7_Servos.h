@@ -20,7 +20,7 @@
  */
 
 // Select the vehicle configuration you have:
-// #define SERVOS_DEFAULT // <------- Select (remove //) one of the remote configurations below
+ #define SERVOS_DEFAULT // <------- Select (remove //) one of the remote configurations below
 // #define SERVOS_LANDY_MN_MODEL
 // #define SERVOS_LANDY_DOUBLE_EAGLE
 // #define SERVOS_C34
@@ -32,8 +32,8 @@
 // #define SERVOS_MECCANO_DUMPER
 // #define SERVOS_OPEN_RC_TRACTOR
 // NOTICE: The following profiles are for EXCAVATOR_MODE only! ---------------------
-//#define SERVOS_EXCAVATOR // For excavators with electric actuators
- #define SERVOS_EXCAVATOR_1060_ESC // For excavators with electric actuators, driven by Hobbywing 1060 ESC (range about 1200 - 1800, 1500 is neutral)
+// #define SERVOS_EXCAVATOR // For excavators with electric actuators
+// #define SERVOS_EXCAVATOR_1060_ESC // For excavators with electric actuators, driven by Hobbywing 1060 ESC (range about 1200 - 1800, 1500 is neutral)
 // #define SERVOS_HYDRAULIC_EXCAVATOR // For hydraulic excavators
 // #define SERVOS_WB_EXCAVATOR // For WB excavators
 // #define SERVOS_CRANE // For Mushroom3D rough terrain crane (servo outputs used as outrigger channels SBUS decoder)

@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+#define VEHICLE_NAME "Caterpillar 323 excavator (use "FLYSKY_FS_I6S_EXCAVATOR" remote profile, WB excavator)"
+
 // Vehicle specific settings for sound, lights, ESC, transmission. This is a vehicle specific file.
 
 // Sound files (22'050 Hz, 8 bit PCM recommended) -----------------------------------------------------------------------
@@ -15,7 +17,7 @@ volatile int fullThrottleVolumePercentage = 140; // Volume Percentage while full
 
 // Choose the motor revving sound (uncomment the one you want) --------
 #define REV_SOUND // uncomment this, if you want to use the separate, optional rev sound
-volatile int revVolumePercentage = 90; // Adjust the idle volume (usually = 100%, more also working, depending on sound) 130
+volatile int revVolumePercentage = 80; // Adjust the idle volume (usually = 100%, more also working, depending on sound) 130
 volatile int engineRevVolumePercentage = 50; // the engine volume will be throttle dependent (usually = 40%, never more than 100%!)
 volatile const uint16_t revSwitchPoint = 100; // The rev sound is played instead of the idle sound above this point
 volatile const uint16_t idleEndPoint = 400; // above this point, we have 100% rev and 0% idle sound volume (usually 500, min. 50 more than revSwitchPoint)
@@ -35,7 +37,7 @@ volatile int jakeBrakeMinRpm = 200; // Adjust the min. RPM for the jake brake (a
 
 // Choose the Diesel (or whatever) ignition "knock" sound (played in the fixed sampling rate interrupt, uncomment the one you want,
 // play around here, the results are amazing, if you hit the right combination with the idle sound!) --------
-volatile int dieselKnockVolumePercentage = 550; // Adjust the Diesel knock volume (usually = 200 - 600%) 600
+volatile int dieselKnockVolumePercentage = 400; // Adjust the Diesel knock volume (usually = 200 - 600%) 550
 volatile int dieselKnockIdleVolumePercentage = 10; // Diesel knock volume while idling (usually = 20%)
 volatile int dieselKnockInterval = 6; // Idle sample length divided by this number (1 - 20, depending on sound files)
 volatile int dieselKnockStartPoint = 110; // Volume will raise above this point ( usually 0, for "open pipe" exhaust about 250)
@@ -131,7 +133,7 @@ volatile int couplingVolumePercentage = 100; // Adjust the volume (usually = 100
 #define HYDROSTATIC_TRACK_MOTORS
 
 // Choose the hydraulic pump sound (uncomment the one you want) --------
-volatile int hydraulicPumpVolumePercentage = 120; // Adjust the volume (usually = 120%)
+volatile int hydraulicPumpVolumePercentage = 100; // Adjust the volume (usually = 120%)
 //#include "sounds/Caterpillar323Hydraulic.h" // Caterpillar 323 excavator
 #include "sounds/Caterpillar323Hydraulic2.h" // Caterpillar 323 excavator (slowed down by factor 2)
 

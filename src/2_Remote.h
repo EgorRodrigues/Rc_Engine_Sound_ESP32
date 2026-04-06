@@ -2,11 +2,11 @@
 
 // Select (remove //) the remote configuration profile you have:
 // #define FLYSKY_FS_I6X            // <------- Flysky FS-i6x
-// #define FLYSKY_FS_I6S            // <------- Flysky FS-i6s
+ #define FLYSKY_FS_I6S            // <------- Flysky FS-i6s
 // #define FLYSKY_FS_I6S_LOADER     // <------- Flysky FS-i6s for BURNIE222 Volvo L120H loader (use IBUS communication setting)
 // #define FLYSKY_FS_I6S_DOZER     // <------- Flysky FS-i6s for dozer (use IBUS communication setting)
-// #define WB_EXCAVATOR  // <------- FWB excavator (use SBUS communication setting)
- #define FLYSKY_FS_I6S_EXCAVATOR  // <------- Flysky FS-i6s for KABOLITE K336 hydraulic excavator (use IBUS communication setting)
+// #define WB_EXCAVATOR  // <------- WB excavator (use SBUS communication setting)
+// #define FLYSKY_FS_I6S_EXCAVATOR  // <------- Flysky FS-i6s for KABOLITE K336 hydraulic excavator (use IBUS communication setting)
 // #define FRSKY_TANDEM_EXCAVATOR   // <------- Frsky Tandem XE for hydraulic excavator (use SBUS communication setting)
 // #define FRSKY_TANDEM_HARMONY_LOADER // <------- Frsky Tandem XE for Lukas Cajkar Harmony 370 (use SBUS communication setting)
 // #define FRSKY_TANDEM_CRANE      // <------- Frsky Tandem XE for Mushroom3D rough terrain crane (use SBUS communication setting)

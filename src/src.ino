@@ -17,7 +17,7 @@
    Arduino IDE is supported as well, but I recommend to use VS Code, because libraries and boards are managed automatically.
 */
 
-char codeVersion[] = "9.15.0-b3"; // Software revision.
+char codeVersion[] = "9.15.0-b4"; // Software revision.
 
 //
 // =======================================================================================================
@@ -80,7 +80,7 @@ char codeVersion[] = "9.15.0-b3"; // Software revision.
 #include <FastLED.h> // https://github.com/FastLED/FastLED        <<------- required for Neopixel support. Use V3.3.3
 #endif
 #include <ESP32AnalogRead.h> // https://github.com/madhephaestus/ESP32AnalogRead <<------- required for battery voltage measurement
-#include <Tone32.h>          // https://github.com/lbernstone/Tone32      <<------- required for battery cell detection beeps // Not for platform = espressif32@4.3.0
+// Tone32 library is not needed - we use LEDC PWM for tone generation instead (works with all platform versions)
 
 // Additional headers (included)
 #include "src/curves.h"    // Nonlinear throttle curve arrays
@@ -94,6 +94,7 @@ char codeVersion[] = "9.15.0-b3"; // Software revision.
 // No need to install these, they come with the ESP32 board definition
 #include "driver/uart.h"  // for UART macro UART_PIN_NO_CHANGE
 #include "driver/rmt.h"   // for PWM signal detection
+#include "driver/gpio.h"  // for GPIO configuration
 #include "driver/mcpwm.h" // for servo PWM output
 #include "rom/rtc.h"      // for displaying reset reason
 #include "soc/rtc_wdt.h"  // for watchdog timer
@@ -517,7 +518,7 @@ bool batteryProtection = false;
 // ESP NOW variables for wireless trailer communication ----------------------------
 #if defined ENABLE_WIRELESS
 
-volatile uint16_t pollRate = 20;
+volatile uint16_t pollRate = 40;
 
 esp_now_peer_info_t peerInfo; // This MUST be global!! Transmission is not working otherwise!
 
@@ -626,9 +627,11 @@ uint8_t broadcastAddress3[6];
 
 #define adr_eprom_ssid 384     // 384 (64)
 #define adr_eprom_password 448 // 448 (64)
+#define adr_eprom_selectedVehicle 512
 
 // DEBUG stuff
 volatile uint8_t coreId = 99;
+String selectedVehicle;
 
 // Our main tasks
 TaskHandle_t Task1;
@@ -1451,9 +1454,9 @@ void IRAM_ATTR fixedPlaybackTimer()
 // Reference https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/rmt.html?highlight=rmt
 static void IRAM_ATTR rmt_isr_handler(void *arg)
 {
-
+  // Get RMT interrupt status register (compatible with all ESP32 platform versions)
   uint32_t intr_st = RMT.int_st.val;
-
+  
   static uint32_t lastFrameTime = millis();
 
   if (millis() - lastFrameTime > 20)
@@ -1476,20 +1479,31 @@ static void IRAM_ATTR rmt_isr_handler(void *arg)
         if (!(intr_st & channel_mask))
           continue;
 
+        // Disable RX for this channel to read data
         RMT.conf_ch[channel].conf1.rx_en = 0;
+        
+        // Switch memory owner to TX to read data
         RMT.conf_ch[channel].conf1.mem_owner = RMT_MEM_OWNER_TX;
+        
+        // Get pointer to RMT memory for this channel
         volatile rmt_item32_t *item = RMTMEM.chan[channel].data32;
 
+        // Read the pulse width from first item (duration0)
         if (item)
         {
           pwmBuf[i + 1] = item->duration0; // pointer -> variable
         }
 
+        // Reset write address to beginning of memory
         RMT.conf_ch[channel].conf1.mem_wr_rst = 1;
+        
+        // Switch memory owner back to RX
         RMT.conf_ch[channel].conf1.mem_owner = RMT_MEM_OWNER_RX;
+        
+        // Re-enable RX for this channel
         RMT.conf_ch[channel].conf1.rx_en = 1;
 
-        // clear RMT interrupt status.
+        // Clear RMT interrupt status for this channel
         RMT.int_clr.val = channel_mask;
       }
 
@@ -1589,23 +1603,48 @@ void IRAM_ATTR onTrailerDataSent(const uint8_t *mac_addr, esp_now_send_status_t 
 
 void setupMcpwm()
 {
-  // 1. set our servo output pins
-  mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, STEERING_PIN); // Set steering as PWM0A
-  mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0B, SHIFTING_PIN); // Set shifting as PWM0B
+  // 1. Configure GPIO pins for servo output
+  gpio_config_t io_conf;
+  
+  // Configure steering pin
+  io_conf.pin_bit_mask = (1ULL << STEERING_PIN);
+  io_conf.mode = GPIO_MODE_OUTPUT;
+  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io_conf.intr_type = GPIO_INTR_DISABLE;
+  gpio_config(&io_conf);
+  
+  // Configure shifting pin
+  io_conf.pin_bit_mask = (1ULL << SHIFTING_PIN);
+  gpio_config(&io_conf);
+  
 #if not defined NEOPIXEL_ON_CH4
-  mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM1A, COUPLER_PIN); // Set coupling as PWM1A
+  // Configure coupler pin
+  io_conf.pin_bit_mask = (1ULL << COUPLER_PIN);
+  gpio_config(&io_conf);
 #endif
-  mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM1B, WINCH_PIN); // Set winch  or beacon as PWM1B
+  
+  // Configure winch pin
+  io_conf.pin_bit_mask = (1ULL << WINCH_PIN);
+  gpio_config(&io_conf);
+  
+  // 2. Connect GPIO pins to MCPWM peripherals
+  mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, STEERING_PIN);   // Set steering as PWM0A
+  mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0B, SHIFTING_PIN);   // Set shifting as PWM0B
+#if not defined NEOPIXEL_ON_CH4
+  mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM1A, COUPLER_PIN);    // Set coupling as PWM1A
+#endif
+  mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM1B, WINCH_PIN);      // Set winch or beacon as PWM1B
 
-  // 2. configure MCPWM parameters
+  // 3. Configure MCPWM parameters
   mcpwm_config_t pwm_config;
-  pwm_config.frequency = SERVO_FREQUENCY; // frequency usually = 50Hz, some servos may run smoother @ 100Hz
-  pwm_config.cmpr_a = 0;                  // duty cycle of PWMxa = 0
-  pwm_config.cmpr_b = 0;                  // duty cycle of PWMxb = 0
-  pwm_config.counter_mode = MCPWM_UP_COUNTER;
-  pwm_config.duty_mode = MCPWM_DUTY_MODE_0; // 0 = not inverted, 1 = inverted
+  pwm_config.frequency = SERVO_FREQUENCY;        // frequency usually = 50Hz, some servos may run smoother @ 100Hz
+  pwm_config.cmpr_a = 0;                         // duty cycle of PWMxa = 0
+  pwm_config.cmpr_b = 0;                         // duty cycle of PWMxb = 0
+  pwm_config.counter_mode = MCPWM_UP_COUNTER;    // Counter mode
+  pwm_config.duty_mode = MCPWM_DUTY_MODE_0;      // 0 = not inverted, 1 = inverted
 
-  // 3. configure channels with settings above
+  // 4. Initialize MCPWM timers with settings above
   mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config); // Configure PWM0A & PWM0B
   mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_1, &pwm_config); // Configure PWM1A & PWM1B
 }
@@ -1631,40 +1670,66 @@ void setupMcpwmESC()
 
   brakeMargin = 0; // Always 0, if not RZ7886 driver mode!
 
-  // 1. set our ESC output pin
+  // 1. Configure GPIO pins for ESC output
+  gpio_config_t io_conf;
+  io_conf.pin_bit_mask = (1ULL << ESC_OUT_PIN);
+  io_conf.mode = GPIO_MODE_OUTPUT;
+  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io_conf.intr_type = GPIO_INTR_DISABLE;
+  gpio_config(&io_conf);
+  
+#if defined SERVOS_HYDRAULIC_EXCAVATOR
+  io_conf.pin_bit_mask = (1ULL << RZ7886_PIN2);
+  gpio_config(&io_conf);
+#endif
+
+  // 2. Connect GPIO pins to MCPWM peripherals
   mcpwm_gpio_init(MCPWM_UNIT_1, MCPWM0A, ESC_OUT_PIN); // Set ESC as PWM0A
 
 #if defined SERVOS_HYDRAULIC_EXCAVATOR
   mcpwm_gpio_init(MCPWM_UNIT_1, MCPWM0B, RZ7886_PIN2); // Set pin 32 as PWM0B
 #endif
 
-  // 2. configure MCPWM parameters
+  // 3. Configure MCPWM parameters
   mcpwm_config_t pwm_config;
-  pwm_config.frequency = 50; // frequency always 50Hz
-  pwm_config.cmpr_a = 0;     // duty cycle of PWMxa = 0
-  pwm_config.cmpr_b = 0;     // duty cycle of PWMxb = 0
-  pwm_config.counter_mode = MCPWM_UP_COUNTER;
-  pwm_config.duty_mode = MCPWM_DUTY_MODE_0; // 0 = not inverted, 1 = inverted
+  pwm_config.frequency = 50;                      // frequency always 50Hz
+  pwm_config.cmpr_a = 0;                          // duty cycle of PWMxa = 0
+  pwm_config.cmpr_b = 0;                          // duty cycle of PWMxb = 0
+  pwm_config.counter_mode = MCPWM_UP_COUNTER;     // Counter mode
+  pwm_config.duty_mode = MCPWM_DUTY_MODE_0;       // 0 = not inverted, 1 = inverted
 
-  // 3. configure channels with settings above
+  // 4. Initialize MCPWM timer with settings above
   mcpwm_init(MCPWM_UNIT_1, MCPWM_TIMER_0, &pwm_config); // Configure PWM0A & PWM0B
 
 #else // Setup for RZ7886 motor driver ----
   Serial.printf("RZ7886 motor driver mode configured. Don't connect ESC to ESC header!\n");
 
-  // 1. set our ESC output pin
+  // 1. Configure GPIO pins for RZ7886 motor driver output
+  gpio_config_t io_conf;
+  io_conf.pin_bit_mask = (1ULL << RZ7886_PIN1);
+  io_conf.mode = GPIO_MODE_OUTPUT;
+  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io_conf.intr_type = GPIO_INTR_DISABLE;
+  gpio_config(&io_conf);
+  
+  io_conf.pin_bit_mask = (1ULL << RZ7886_PIN2);
+  gpio_config(&io_conf);
+
+  // 2. Connect GPIO pins to MCPWM peripherals
   mcpwm_gpio_init(MCPWM_UNIT_1, MCPWM0A, RZ7886_PIN1); // Set RZ7886 pin 1 as PWM0A
   mcpwm_gpio_init(MCPWM_UNIT_1, MCPWM0B, RZ7886_PIN2); // Set RZ7886 pin 2 as PWM0B
 
-  // 2. configure MCPWM parameters
+  // 3. Configure MCPWM parameters
   mcpwm_config_t pwm_config;
-  pwm_config.frequency = RZ7886_FREQUENCY; // frequency
-  pwm_config.cmpr_a = 0;                   // duty cycle of PWMxa = 0
-  pwm_config.cmpr_b = 0;                   // duty cycle of PWMxb = 0
-  pwm_config.counter_mode = MCPWM_UP_COUNTER;
-  pwm_config.duty_mode = MCPWM_DUTY_MODE_0; // 0 = not inverted, 1 = inverted
+  pwm_config.frequency = RZ7886_FREQUENCY;        // frequency
+  pwm_config.cmpr_a = 0;                          // duty cycle of PWMxa = 0
+  pwm_config.cmpr_b = 0;                          // duty cycle of PWMxb = 0
+  pwm_config.counter_mode = MCPWM_UP_COUNTER;     // Counter mode
+  pwm_config.duty_mode = MCPWM_DUTY_MODE_0;       // 0 = not inverted, 1 = inverted
 
-  // 3. configure channels with settings above
+  // 4. Initialize MCPWM timer with settings above
   mcpwm_init(MCPWM_UNIT_1, MCPWM_TIMER_0, &pwm_config); // Configure PWM0A & PWM0B
 #endif
   Serial.printf("-------------------------------------\n");
@@ -1682,8 +1747,11 @@ void setupEspNow()
 #if defined ENABLE_WIRELESS
   Serial.printf("ENABLE_WIRELESS option enabled\n");
   // Serial.printf("Sound controller MAC address: %s\n", WiFi.macAddress().c_str());
-  //  Set device as a Wi-Fi Station for ESP-NOW
-  WiFi.mode(WIFI_STA); // WIFI_STA = Station
+  //  Set device as a Wi-Fi Station for ESP-NOW and Access Point for web interface
+  WiFi.mode(WIFI_AP_STA); // WIFI_AP_STA = Access Point + Station (required for both web interface and ESP-NOW)
+
+  // Start access point
+  WiFi.softAP(ssid.c_str(), password.c_str());
 
   // Set IP address
   IPAddress IP = WiFi.softAPIP();
@@ -1695,12 +1763,6 @@ void setupEspNow()
   Serial.println(password);
   Serial.print("IP address: ");
   Serial.println(IP);
-
-  // shut down wifi
-  WiFi.disconnect();
-
-  // Start access point
-  WiFi.softAP(ssid.c_str(), password.c_str());
 
   Serial.printf("\nWiFi Tx Power Level: %u", WiFi.getTxPower());
   WiFi.setTxPower(cpType); // WiFi and ESP-Now power according to "0_generalSettings.h"
@@ -1795,8 +1857,7 @@ void setupBattery()
     Serial.printf("Battery cutoff voltage: %.2f V (%i * %.2f V) \n", batteryCutoffvoltage, numberOfCells, CUTOFF_VOLTAGE);
     for (uint8_t beeps = 0; beeps < numberOfCells; beeps++)
     { // Number of beeps = number of cells in series
-      tone(26, 3000, 4, 0);
-      // tone(26, 3000, 4); // For platform = espressif32@4.3.0
+      tone(26, 3000, 4);
       delay(200);
     }
   }
@@ -1807,8 +1868,7 @@ void setupBattery()
     bool locked = true;
     for (uint8_t beeps = 0; beeps < 10; beeps++)
     { // Number of beeps = number of cells in series
-      tone(26, 3000, 4, 0);
-      // tone(26, 3000, 4); // For platform = espressif32@4.3.0
+      tone(26, 3000, 4);
       delay(30);
     }
     while (locked)
@@ -1842,6 +1902,7 @@ void setupEeprom()
 #endif
   eepromInit(); // Init new board with default values
   eepromRead(); // Read settings from Eeprom
+  selectedVehicle = VEHICLE_NAME; // Set to current vehicle name
   Serial.print("current eeprom_id: ");
   Serial.println(EEPROM.read(adr_eprom_init));
   Serial.println("change it for default value upload!\n");
@@ -1926,8 +1987,8 @@ void setup()
   Serial.printf("ESC takeoff punch: %i (Usually 0. Enlarge it up to about 150, if your motor is too weak around neutral.)\n", escTakeoffPunch);
   Serial.printf("ESC reverse plus: %i (Usually 0. Enlarge it up to about 220, if your reverse speed is too slow.)\n", escReversePlus);
   Serial.printf("ESC ramp time for crawler mode: %i (about 10 - 15), less = more direct control = less virtual inertia)\n", crawlerEscRampTime);
-
   Serial.printf("**************************************************************************************************\n\n");
+  Serial.printf("Selected vehicle: %s\n\n", VEHICLE_NAME);
 
   // Semaphores are useful to stop a Task proceeding, where it should be paused to wait,
   // because it is sharing a resource, such as the PWM variable.
@@ -2036,25 +2097,54 @@ void setup()
   }
   // New: PWM read setup, using rmt. Thanks to croky-b
   uint8_t i;
-  rmt_config_t rmt_channels[PWM_CHANNELS_NUM] = {};
-
+  
+  // Configure RMT channels for PWM signal reception
+  // Using direct register configuration for compatibility across platform versions
   for (i = 0; i < PWM_CHANNELS_NUM; i++)
   {
-    rmt_channels[i].channel = (rmt_channel_t)PWM_CHANNELS[i];
-    rmt_channels[i].gpio_num = (gpio_num_t)PWM_PINS[i];
-    rmt_channels[i].clk_div = RMT_RX_CLK_DIV;
-    rmt_channels[i].mem_block_num = 1;
-    rmt_channels[i].rmt_mode = RMT_MODE_RX;
-    rmt_channels[i].rx_config.filter_en = true;
-    rmt_channels[i].rx_config.filter_ticks_thresh = 100; // Pulses shorter than this will be filtered out
-    rmt_channels[i].rx_config.idle_threshold = RMT_RX_MAX_US * RMT_TICK_PER_US;
-
-    rmt_config(&rmt_channels[i]);
-    rmt_set_rx_intr_en(rmt_channels[i].channel, true);
-    rmt_rx_start(rmt_channels[i].channel, 1);
+    uint8_t channel = PWM_CHANNELS[i];
+    gpio_num_t pin = (gpio_num_t)PWM_PINS[i];
+    
+    // Configure GPIO pin for RMT input
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << pin),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&io_conf);
+    
+    // Connect GPIO to RMT
+    rmt_set_pin((rmt_channel_t)channel, RMT_MODE_RX, pin);
+    
+    // Configure RMT channel
+    RMT.conf_ch[channel].conf0.div_cnt = RMT_RX_CLK_DIV;
+    RMT.conf_ch[channel].conf1.mem_block_num = 1;
+    RMT.conf_ch[channel].conf1.tx_conti_mode = 0; // Not in TX continuous mode
+    RMT.conf_ch[channel].conf1.rx_en = 0;         // Start disabled
+    RMT.conf_ch[channel].conf1.mem_owner = RMT_MEM_OWNER_RX;
+    RMT.conf_ch[channel].conf1.mem_wr_rst = 1;    // Reset write pointer
+    
+    // Set idle threshold (pulses longer than this will trigger idle interrupt)
+    RMT.conf_ch[channel].conf0.idle_thres = RMT_RX_MAX_US * RMT_TICK_PER_US;
+    
+    // Enable filter to ignore short pulses
+    RMT.conf_ch[channel].conf1.rx_filter_en = 1;
+    RMT.conf_ch[channel].conf1.rx_filter_thres = 100; // Pulses shorter than this will be filtered out
+    
+    // Clear any pending interrupts
+    RMT.int_clr.val = BIT(channel * 3 + 1);
+    
+    // Enable interrupt for this channel
+    RMT.int_ena.val |= BIT(channel * 3 + 1);
+    
+    // Enable RX for this channel
+    RMT.conf_ch[channel].conf1.rx_en = 1;
   }
 
-  rmt_isr_register(rmt_isr_handler, NULL, 0, NULL); // This is our interrupt
+  // Register the RMT interrupt handler
+  rmt_isr_register(rmt_isr_handler, NULL, 0, NULL);
 
 #endif // -----------------------------------------------------------
 
@@ -3246,6 +3336,7 @@ void eepromInit()
 
     writeStringToEEPROM(adr_eprom_ssid, default_ssid);
     writeStringToEEPROM(adr_eprom_password, default_password);
+    writeStringToEEPROM(adr_eprom_selectedVehicle, VEHICLE_NAME);
     EEPROM.commit();
     Serial.println("EEPROM initialized.");
   }
@@ -3327,6 +3418,7 @@ void eepromWrite()
 
   writeStringToEEPROM(adr_eprom_ssid, ssid);
   writeStringToEEPROM(adr_eprom_password, password);
+  writeStringToEEPROM(adr_eprom_selectedVehicle, selectedVehicle);
   EEPROM.commit();
   Serial.println("EEPROM written.");
   eepromDebugRead();
@@ -3404,6 +3496,7 @@ void eepromRead()
 
   readStringFromEEPROM(adr_eprom_ssid, &ssid);
   readStringFromEEPROM(adr_eprom_password, &password);
+  readStringFromEEPROM(adr_eprom_selectedVehicle, &selectedVehicle);
 
   Serial.println("EEPROM read.");
 }
@@ -5006,6 +5099,34 @@ void esc()
 
 //
 // =======================================================================================================
+// TONE GENERATION FOR BATTERY CELL DETECTION BEEPS (using LEDC, compatible with all platform versions)
+// =======================================================================================================
+//
+
+// Custom tone function using ESP32 LEDC PWM (replaces Tone32 library for compatibility)
+// Parameters: pin, frequency, duration_ms, unused_parameter
+void tone(uint8_t pin, unsigned int frequency, unsigned long duration, uint8_t unused = 0)
+{
+  // Setup LEDC for tone generation on the specified pin
+  // Using LEDC channel 15 (arbitrary choice, not used elsewhere)
+  const uint8_t ledcChannel = 15;
+  const uint8_t ledcResolution = 8;
+  
+  // Configure LEDC PWM
+  ledcSetup(ledcChannel, frequency, ledcResolution);  // Channel, frequency, resolution
+  ledcAttachPin(pin, ledcChannel);                     // Attach pin to channel
+  ledcWrite(ledcChannel, 128);                         // 50% duty cycle for tone
+  
+  // Play tone for specified duration
+  delay(duration);
+  
+  // Stop tone
+  ledcWrite(ledcChannel, 0);  // Silence
+  ledcDetachPin(pin);         // Detach pin from channel
+}
+
+//
+// =======================================================================================================
 // BATTERY MONITORING
 // =======================================================================================================
 //
@@ -6360,11 +6481,11 @@ void trailerControl()
 #ifdef TRAILER_LIGHTS_TRAILER_PRESENCE_SWITCH_DEPENDENT // Tralier lights depending on truck mounted switch
     if (trailerDetected)
     {
-      trailerData.tailLight = ledcRead(2);
-      trailerData.sideLight = ledcRead(8);
-      trailerData.reversingLight = ledcRead(6);
-      trailerData.indicatorL = ledcRead(3);
-      trailerData.indicatorR = ledcRead(4);
+      trailerData.tailLight = constrain(ledcRead(2), 0, 255);
+      trailerData.sideLight = constrain(ledcRead(8), 0, 255);
+      trailerData.reversingLight = constrain(ledcRead(6), 0, 255);
+      trailerData.indicatorL = constrain(ledcRead(3), 0, 255);
+      trailerData.indicatorR = constrain(ledcRead(4), 0, 255);
     }
     else
     {
@@ -6375,11 +6496,11 @@ void trailerControl()
       trailerData.indicatorR = 0;
     }
 #else // Trailer lights always on
-    trailerData.tailLight = ledcRead(2); // These are timer numbers, not pin numbers!
-    trailerData.sideLight = ledcRead(8);
-    trailerData.reversingLight = ledcRead(6);
-    trailerData.indicatorL = ledcRead(3);
-    trailerData.indicatorR = ledcRead(4);
+    trailerData.tailLight = constrain(ledcRead(2), 0, 255); // These are timer numbers, not pin numbers!
+    trailerData.sideLight = constrain(ledcRead(8), 0, 255);
+    trailerData.reversingLight = constrain(ledcRead(6), 0, 255);
+    trailerData.indicatorL = constrain(ledcRead(3), 0, 255);
+    trailerData.indicatorR = constrain(ledcRead(4), 0, 255);
 #endif
     // Other signals
     trailerData.legsUp = legsUp;

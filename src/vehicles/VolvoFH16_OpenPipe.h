@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+#define VEHICLE_NAME "Volvo FH truck. Inline 6, open pipes, alternative version"
+
 // Vehicle specific settings for sound, lights, ESC, transmission. This is a vehicle specific file.
 // See: https://www.youtube.com/watch?v=MU1iwzl33Zw&list=LL&index=4
 
