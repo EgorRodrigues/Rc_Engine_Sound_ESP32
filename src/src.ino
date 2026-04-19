@@ -2551,8 +2551,16 @@ void processGamepad(ControllerPtr ctl) {
     // Map PS4 controller to RC channels
     // Left stick X: steering (CH1)
     pulseWidthRaw[1] = map(ctl->axisX(), -511, 512, 1000, 2000);
-    // Left stick Y: throttle (CH3) - invert Y axis
-    pulseWidthRaw[3] = map(-ctl->axisY(), -511, 512, 1000, 2000);
+    // R2 (throttle) for forward, L2 (brake) for reverse (CH3)
+    int r2 = ctl->throttle(); // 0 to 1023
+    int l2 = ctl->brake();    // 0 to 1023
+    if (r2 > 0) {
+        pulseWidthRaw[3] = map(r2, 0, 1023, 1500, 2000);
+    } else if (l2 > 0) {
+        pulseWidthRaw[3] = map(l2, 0, 1023, 1500, 1000);
+    } else {
+        pulseWidthRaw[3] = 1500;
+    }
     // Right stick X: function_L (CH6)
     pulseWidthRaw[6] = map(ctl->axisRX(), -511, 512, 1000, 2000);
     // Right stick Y: function_R (CH5) - invert Y axis
@@ -2561,14 +2569,14 @@ void processGamepad(ControllerPtr ctl) {
     // Buttons
     // Horn (CH4): Cross (A) button
     pulseWidthRaw[4] = ctl->a() ? 2000 : 1000;
-    // Gearbox (CH2): D-pad up/down
+    // Gearbox (CH2): D-pad up/down (Latching logic)
+    static int lastGearboxPulse = 1500;
     if (ctl->dpad() & DPAD_UP) {
-        pulseWidthRaw[2] = 2000; // High gear
+        lastGearboxPulse = 2000; // High gear
     } else if (ctl->dpad() & DPAD_DOWN) {
-        pulseWidthRaw[2] = 1000; // Low gear
-    } else {
-        pulseWidthRaw[2] = 1500; // Neutral
+        lastGearboxPulse = 1000; // Low gear
     }
+    pulseWidthRaw[2] = lastGearboxPulse;
 
     // Mode1 (CH8): L1 button
     pulseWidthRaw[8] = ctl->l1() ? 2000 : 1000;
